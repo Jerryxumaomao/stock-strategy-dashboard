@@ -40,7 +40,8 @@ def build(config=None, source=None, period="5y", verbose=True):
     return results
 
 
-STRAT_LABEL = {"dip": "📉宜抄底", "dip_re": "📉抄底+再进", "brk": "📈宜突破", "avoid": "🚫回避"}
+STRAT_LABEL = {"dip": "📉宜抄底", "dip_re": "📉抄底+再进", "brk": "📈宜突破",
+               "brk_atr": "📈突破·宽止损", "avoid": "🚫回避"}
 
 
 def render(results, cfg):

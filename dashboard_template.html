@@ -39,12 +39,12 @@ footer b{color:#e8e0d2}
 <footer id="foot"></footer>
 <script>
 const PAYLOAD=/*__DATA__*/{};
-const SLAB={brk:['📈 宜突破','c-brk'],dip:['📉 宜抄底','c-dip'],dip_re:['📉 抄底+再进','c-dip'],avoid:['🚫 回避','c-avoid']};
+const SLAB={brk:['📈 宜突破','c-brk'],brk_atr:['📈 突破·宽止损','c-brk'],dip:['📉 宜抄底','c-dip'],dip_re:['📉 抄底+再进','c-dip'],avoid:['🚫 回避','c-avoid']};
 const $=id=>document.getElementById(id);
 $('ttl').textContent=PAYLOAD.title||'Stock Strategy Dashboard';
 $('sub').textContent='更新 '+PAYLOAD.as_of+' · 数据源 '+PAYLOAD.source+' · '+PAYLOAD.tickers.length+' 只 · 决策辅助非投资建议';
 const money=n=>'$'+(+n).toLocaleString(undefined,{maximumFractionDigits:2});
-function bt(r){var b=r.backtest||{};var s=r.strategy;var x=(s==='brk'?b.brk:s==='dip_re'?b.dip_re:b.dip)||{};if(!x.n)return '';return '回测: '+x.n+'笔 · 胜'+x.win_rate+'% · 期望'+x.expectancy_R+'R';}
+function bt(r){var b=r.backtest||{};var s=r.strategy;var x=(s==='brk'?b.brk:s==='brk_atr'?b.brk_atr:s==='dip_re'?b.dip_re:b.dip)||{};if(!x.n)return '';return '回测: '+x.n+'笔 · 胜'+x.win_rate+'% · 期望'+x.expectancy_R+'R';}
 function sigHtml(r){var s=r.signal;if(!s||!s.type)return '';
  if(s.type==='breakout')return '<div class="sig"><div class="t" style="color:#217a44">📈 突破买入</div>突破 &gt; '+money(s.trigger)+' · 止损 '+money(s.stop)+'<br><span style="color:var(--dim)">'+s.status+'</span></div>';
  return '<div class="sig"><div class="t" style="color:var(--primary)">📉 分批买入区</div>'+s.buy_zones.map(money).join(' / ')+' · 止损 '+money(s.stop)+'<br><span style="color:var(--dim)">'+(s.note||'')+'</span></div>';}
@@ -53,7 +53,7 @@ function card(r){var sl=SLAB[r.strategy]||SLAB.avoid;var cc=r.chg>=0?'up':'down'
  '<div><div class="p">'+money(r.last)+'</div><div class="'+cc+'" style="font-size:12px;font-weight:600;text-align:right">'+(r.chg>=0?'▲':'▼')+' '+r.chg+'%</div></div></div>'+
  '<div class="rows"><div class="row"><span class="k">距52周高</span><span class="down">'+r.pct_from_high+'%</span></div>'+(r.bucket?'<div class="row"><span class="k">类别</span><span>'+r.bucket+'</span></div>':'')+'</div>'+
  sigHtml(r)+(bt(r)?'<div class="bt">'+bt(r)+'</div>':'')+(r.action?'<div class="act">'+r.action+'</div>':'')+'</div>';}
-const order=['brk','dip','dip_re','avoid'];const secName={brk:'📈 宜突破',dip:'📉 宜抄底',dip_re:'📉 抄底+再进',avoid:'🚫 回避'};
+const order=['brk','brk_atr','dip','dip_re','avoid'];const secName={brk:'📈 宜突破',brk_atr:'📈 突破·宽止损',dip:'📉 宜抄底',dip_re:'📉 抄底+再进',avoid:'🚫 回避'};
 const byS={};PAYLOAD.tickers.forEach(r=>{(byS[r.strategy]=byS[r.strategy]||[]).push(r)});
 $('counts').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="count">'+secName[s]+' '+byS[s].length+'</div>').join('');
 $('body').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="sec">'+secName[s]+'</div><div class="grid">'+byS[s].map(card).join('')+'</div>').join('');

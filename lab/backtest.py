@@ -7,7 +7,7 @@ Metrics: win_rate, expectancy in R (risk = entry-stop), plus timing diagnostics
   (entry MAE, post-exit upside "left on table", false-stop rate).
 This is a reproducible *proxy* of a discretionary method, not strict chanlun.
 """
-from .indicators import sma
+from .indicators import sma, atr
 
 
 def _trail_exit(C, H, L, n, i, stop):
@@ -72,6 +72,26 @@ def brk_trades(bars):
         if u and u[0] and i >= 40 and C[i] >= max(H[i - 40:i]) and C[i] > C[i - 1] and (i - last) >= 10:
             entry = C[i]; stop = min(L[i - 10:i + 1]) * 0.98
             if stop >= entry:
+                i += 1; continue
+            risk = entry - stop; ex, xi, why = _trail_exit(C, H, L, n, i, stop)
+            fw = H[xi + 1:min(xi + 21, n)]
+            tr.append(_rec(entry, ex, risk, min(L[i + 1:xi + 1]) if xi > i else entry, fw, why))
+            last = xi; i = xi + 1
+        else:
+            i += 1
+    return tr
+
+
+def brk_atr_trades(bars, k=2.0):
+    """Breakout entry with an ATR-based wide stop — for high-volatility names that
+    get whipsawed out by a tight swing-low stop."""
+    n = len(bars); C = [b["c"] for b in bars]; H = [b["h"] for b in bars]; L = [b["l"] for b in bars]
+    tr = []; i = 200; last = -999
+    while i < n - 1:
+        u = _uptrend(C, i)
+        if u and u[0] and i >= 40 and C[i] >= max(H[i - 40:i]) and C[i] > C[i - 1] and (i - last) >= 10:
+            entry = C[i]; a = atr(H, L, C, i); stop = entry - k * a
+            if a <= 0 or stop >= entry:
                 i += 1; continue
             risk = entry - stop; ex, xi, why = _trail_exit(C, H, L, n, i, stop)
             fw = H[xi + 1:min(xi + 21, n)]

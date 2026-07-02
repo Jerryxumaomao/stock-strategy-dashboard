@@ -3,8 +3,8 @@ Per-ticker diagnosis: classify each stock and assign the strategy that historica
 fits it — dip-buy, breakout, or avoid — then produce current actionable levels.
 This is the "diagnose every ticker, use a different strategy per type" core.
 """
-from .indicators import sma, annualized_vol
-from .backtest import dip_trades, brk_trades, agg
+from .indicators import sma, annualized_vol, atr
+from .backtest import dip_trades, brk_trades, brk_atr_trades, agg
 
 
 def _stage(C, n):
@@ -36,12 +36,13 @@ def diagnose(ticker, bars, name=None):
                     "backtest": {}})
         return rec
 
-    d = agg(dip_trades(bars)); dr = agg(dip_trades(bars, True)); bk = agg(brk_trades(bars))
-    rec["backtest"] = {"dip": d, "dip_re": dr, "brk": bk}
+    d = agg(dip_trades(bars)); dr = agg(dip_trades(bars, True))
+    bk = agg(brk_trades(bars)); ba = agg(brk_atr_trades(bars))
+    rec["backtest"] = {"dip": d, "dip_re": dr, "brk": bk, "brk_atr": ba}
 
     # pick the strategy with the highest positive expectancy & enough signals
     best, bexp = "avoid", 0.10
-    for key, res in (("dip", d), ("dip_re", dr), ("brk", bk)):
+    for key, res in (("dip", d), ("dip_re", dr), ("brk", bk), ("brk_atr", ba)):
         if res["n"] >= 5 and res["expectancy_R"] > bexp:
             best, bexp = key, res["expectancy_R"]
     rec["strategy"] = best
@@ -63,13 +64,18 @@ def diagnose(ticker, bars, name=None):
         return rec
 
     # actionable current levels for the assigned strategy
-    if best == "brk":
+    if best in ("brk", "brk_atr"):
         pivot = round(max(H[-31:-1]), 2) if n >= 31 else round(max(H), 2)
-        stop = round(min(L[-10:]) * 0.98, 2)
         to_piv = round((pivot - last) / last * 100, 1)
         status = ("临界突破·可挂单" if to_piv <= 12 else f"筑底中·距触发+{to_piv}%")
-        rec["signal"] = {"type": "breakout", "trigger": pivot, "stop": stop, "to_pivot": to_piv, "status": status}
-        rec["action"] = f"该票宜追涨:突破 > ${pivot} 买入({status}),止损 ${stop}。别回踩抄底。"
+        if best == "brk_atr":
+            a = atr(H, L, C, n - 1); stop = round(pivot - 2.0 * a, 2)
+            rec["signal"] = {"type": "breakout", "trigger": pivot, "stop": stop, "to_pivot": to_piv, "status": status, "wide": True}
+            rec["action"] = f"高波动·宜突破+宽止损:突破 > ${pivot} 买入({status}),ATR宽止损 ${stop}(约2×ATR),仓位减半。别抄底、别用紧止损。"
+        else:
+            stop = round(min(L[-10:]) * 0.98, 2)
+            rec["signal"] = {"type": "breakout", "trigger": pivot, "stop": stop, "to_pivot": to_piv, "status": status}
+            rec["action"] = f"该票宜追涨:突破 > ${pivot} 买入({status}),止损 ${stop}。别回踩抄底。"
     else:
         # dip buy zones anchored near SMA50 / recent structure
         z1 = round(s50 * 1.005, 2); z2 = round(s50 * 0.97, 2); z3 = round(min(L[-20:]) * 0.99, 2)
