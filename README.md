@@ -1,7 +1,8 @@
 # 📊 Stock Strategy Dashboard (Agent Skill)
 
 Diagnose every stock in your watchlist and let the data pick the strategy — **dip-buy**,
-**breakout**, or **avoid** — then backtest it and render a clean, self-contained dashboard.
+**breakout** (incl. an ATR-wide-stop variant for high-vol names), **long-hold**, or
+**avoid** — then backtest it and render a clean, self-contained dashboard.
 
 Built to run **inside Claude Code or Codex as a skill**: your agent asks for your watchlist,
 diagnoses each stock, assigns a strategy, and builds the dashboard for you. Also works as a
@@ -9,7 +10,9 @@ plain Python CLI.
 
 > **Core idea:** different stocks need different strategies. A momentum leader (NVDA/MU) that only
 > gaps and runs must be **bought on breakouts**, not dip-bought. A stock that pulls back cleanly
-> (CIEN/AMAT) is a **dip-buy**. A whippy 100%-vol name is best **avoided** until it tightens.
+> (CIEN/AMAT) is a **dip-buy**. A high-vol name whipsawed by tight stops needs an **ATR-wide stop**.
+> A strong secular uptrend where active trading keeps losing (MRVL/ARM) is often best just
+> **held** (accumulate cheap on dips, unlevered). A broken/choppy name is **avoided** until it heals.
 > The tool diagnoses which is which — per stock — from 5 years of history.
 
 ## Quick start
@@ -31,17 +34,19 @@ open dashboard.html                    # (or double-click) — self-contained
 ```
 
 ## What you get, per stock
-- **Strategy label**: 📉 dip-buy · 📈 breakout · 🚫 avoid (+ reason bucket)
+- **Strategy label**: 📉 dip-buy · 📈 breakout · 📈 breakout·wide-stop · 🏔️ hold · 🚫 avoid (+ reason bucket)
 - **Stage & volatility** (SEPA-style trend stage, annualized vol)
-- **Backtest**: win rate + expectancy (R) for the assigned strategy
-- **Actionable levels**: dip buy zones + stop, or breakout trigger + stop
+- **Backtest**: win rate + expectancy (R) — or, for hold, total return / CAGR / max drawdown
+- **Actionable levels**: dip buy zones + stop · breakout trigger + stop · or hold buy-cheap zones + target + trend-exit
 
 ## Strategies
 | Strategy | For | Entry | Exit | Stop |
 |---|---|---|---|---|
-| 📉 dip-buy | stocks that pull back to 50MA | pullback to 50MA + reversal, 2-3 tranches | half at +2R, trail rest on 50MA | recent swing low |
-| 📈 breakout | momentum leaders that gap & run | break above recent 30-40d high | trail on 50MA | breakout base |
-| 🚫 avoid | neither rule profitable | — (wait for VCP → breakout, or 200MA reclaim) | — | — |
+| 📉 dip-buy | pulls back cleanly to 50MA | pullback + reversal, 2-3 tranches | half at +2R, trail rest on 50MA | recent swing low |
+| 📈 breakout | momentum leaders that gap & run | break above recent 30-40d high | trail on 50MA | breakout base (tight) |
+| 📈 breakout·wide-stop | high-vol names whipsawed by tight stops | break above recent high | trail on 50MA | ~2×ATR (adaptive) + half size |
+| 🏔️ hold | strong secular uptrend where active trading keeps losing | accumulate cheap on pullbacks to 50/150/200MA | trim at prior high; exit on 200MA break | 200-day MA (**unlevered stock only** — never options) |
+| 🚫 avoid | none profitable (crashed / choppy / too new) | — (wait for VCP → breakout, or 200MA reclaim) | — | — |
 
 ## Data sources
 Default: **Yahoo Finance** (`yfinance`, free, no account). Pluggable — implement `ibkr` /

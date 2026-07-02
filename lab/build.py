@@ -41,7 +41,7 @@ def build(config=None, source=None, period="5y", verbose=True):
 
 
 STRAT_LABEL = {"dip": "📉宜抄底", "dip_re": "📉抄底+再进", "brk": "📈宜突破",
-               "brk_atr": "📈突破·宽止损", "avoid": "🚫回避"}
+               "brk_atr": "📈突破·宽止损", "hold": "🏔️长持", "avoid": "🚫回避"}
 
 
 def render(results, cfg):

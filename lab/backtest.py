@@ -102,6 +102,24 @@ def brk_atr_trades(bars, k=2.0):
     return tr
 
 
+def hold_stats(bars):
+    """Buy-and-hold profile: total return, CAGR, and the worst drawdown you'd have to endure.
+    Used to flag strong secular uptrends where active trading (with stops) underperforms
+    simply holding the (unlevered) stock — the 'position/hold' strategy."""
+    C = [b["c"] for b in bars]
+    n = len(C)
+    if n < 2 or C[0] <= 0:
+        return {"buy_hold_pct": 0, "cagr": 0, "max_dd": 0}
+    yrs = n / 252
+    bh = (C[-1] / C[0] - 1) * 100
+    cagr = ((C[-1] / C[0]) ** (1 / yrs) - 1) * 100 if yrs > 0 else 0
+    peak = C[0]; dd = 0
+    for x in C:
+        peak = max(peak, x)
+        dd = min(dd, (x - peak) / peak)
+    return {"buy_hold_pct": round(bh, 0), "cagr": round(cagr, 1), "max_dd": round(dd * 100, 0)}
+
+
 def _rec(entry, ex, risk, seg_low, fw, why):
     mae = (entry - seg_low) / entry * 100
     post_up = ((max(fw) - ex) / ex * 100) if fw else 0.0

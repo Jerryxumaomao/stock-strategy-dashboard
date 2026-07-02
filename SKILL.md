@@ -52,9 +52,16 @@ Output: `dashboard.html` (self-contained, open in any browser). `config.json` ho
   in 2-3 tranches; exit half at +2R, trail the rest on the 50-day MA. Stop below the recent low.
 - **📈 breakout** — momentum leaders that *don't* pull back; they gap and run. Buy the break above
   the recent 30-40 day high (pivot); trail on the 50-day MA. **Do not dip-buy these.**
-- **🚫 avoid** — neither rule was profitable historically. The diagnosis gives the reason bucket:
-  *high-volatility whipsaw* (wait for a tight VCP base, then treat as breakout), *parabolic crash*
-  (falling knife — wait for a 200-MA reclaim + multi-week base), or *insufficient history*.
+- **📈 breakout·wide-stop** — high-volatility names that get whipsawed out by a tight stop. Same
+  breakout entry, but stop = ~2×ATR (adaptive) and half position size.
+- **🏔️ hold** — strong secular uptrends where *active* trading (with stops) keeps losing but the
+  stock rips over time (e.g. MRVL/ARM). Best just **held as unlevered stock**: accumulate cheap on
+  pullbacks to the 50/150/200-day MAs, trim at the prior high, exit only on a 200-MA break. The
+  signal gives the buy-cheap zones + target + trend-exit, and the buy-and-hold return **and max
+  drawdown** (you must be able to sit through a large drawdown; **never use options/leverage for this**).
+- **🚫 avoid** — none of the above was profitable and it's not a strong uptrend to hold. Reason
+  bucket: *parabolic crash* (falling knife — wait for 200-MA reclaim + base), *insufficient history*,
+  or *choppy/broken*.
 
 Exit rule (biggest edge, from diagnostics): winners are cut too early with fixed targets, so the
 engine **trails on the 50-day MA to let winners run** (roughly doubles expectancy vs a fixed +2R).

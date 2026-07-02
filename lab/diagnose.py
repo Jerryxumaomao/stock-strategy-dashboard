@@ -4,7 +4,7 @@ fits it — dip-buy, breakout, or avoid — then produce current actionable leve
 This is the "diagnose every ticker, use a different strategy per type" core.
 """
 from .indicators import sma, annualized_vol, atr
-from .backtest import dip_trades, brk_trades, brk_atr_trades, agg
+from .backtest import dip_trades, brk_trades, brk_atr_trades, hold_stats, agg
 
 
 def _stage(C, n):
@@ -46,6 +46,22 @@ def diagnose(ticker, bars, name=None):
         if res["n"] >= 5 and res["expectancy_R"] > bexp:
             best, bexp = key, res["expectancy_R"]
     rec["strategy"] = best
+
+    # 若主动策略都不占优,但它是强趋势长牛,则改判"长持"(正股·不加杠杆)
+    hs = hold_stats(bars); rec["hold_stats"] = hs
+    if best == "avoid" and hs["cagr"] >= 25 and pct_from_high > -40 and stage != "Stage4下跌" and s200 and last > s200 * 0.9:
+        best = "hold"; rec["strategy"] = "hold"
+
+    if best == "hold":
+        s150 = sma(C, 150, n - 1) or s50
+        z = sorted({round(s50, 2), round(s150, 2), round(s200, 2)}, reverse=True)  # 越跌越便宜
+        rec["signal"] = {"type": "hold", "buy_zones": z,
+                         "target": [round(hi252, 2), round(hi252 * 1.15, 2)],
+                         "trend_stop": round(s200 * 0.95, 2)}
+        zt = " / ".join("$" + str(x) for x in z)
+        rec["action"] = (f"长持(正股·不加杠杆):回踩 {zt} 越跌越买(买便宜);目标 ${round(hi252,2)} 前高分批止盈,"
+                         f"跌破200日线(~${round(s200*0.95,2)})离场。近{round(n/252,1)}年买持 +{hs['buy_hold_pct']}% 但最大回撤 {hs['max_dd']}%,须扛得住、绝不用杠杆/期权。")
+        return rec
 
     if best == "avoid":
         if pct_from_high <= -45:
