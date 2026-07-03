@@ -5,7 +5,8 @@ CLI for stock-strategy-dashboard.
   python run.py init                 interactive: enter your watchlist, then build
   python run.py add NVDA MSFT ...    add tickers (each gets diagnosed), then rebuild
   python run.py remove NVDA          drop a ticker, rebuild
-  python run.py build                rebuild dashboard from config.json
+  python run.py build                rebuild dashboard from config.json (auto: freeze + review)
+  python run.py review               intraday refresh: snapshot + score cohorts + check proposals
   python run.py diagnose NVDA        print one ticker's diagnosis (no dashboard write)
 
 Data source defaults to Yahoo Finance (free). Change "source" in config.json.
@@ -77,6 +78,9 @@ def main():
     elif cmd == "add": cmd_add(args)
     elif cmd == "remove": cmd_remove(args)
     elif cmd == "build": build(_cfg())
+    elif cmd == "review":
+        from lab.review import run_review
+        run_review(_cfg(), ROOT, do_snapshot=True)
     elif cmd == "diagnose": cmd_diagnose(args)
     else: print(__doc__)
 

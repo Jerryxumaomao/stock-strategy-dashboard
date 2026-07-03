@@ -37,6 +37,13 @@ def build(config=None, source=None, period="5y", verbose=True):
             if verbose: print(f"  {t}: ERROR {e}")
         time.sleep(0.2)  # be polite to the data source
     render(results, cfg)
+    # 复盘闭环:冻结今日推荐(幂等,每天一次)+ 合并行情快照 + 打分 + 检查提案门槛
+    try:
+        from .review import freeze, run_review
+        print("[freeze]", freeze(results, ROOT))
+        run_review(cfg, ROOT, do_snapshot=True)
+    except Exception as e:
+        print("[review] skipped:", e)
     return results
 
 

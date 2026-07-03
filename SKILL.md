@@ -33,9 +33,13 @@ IBKR, TradingView, Alpaca, etc. (change `"source"` in `config.json`).
 python run.py init                 # ask the user for their watchlist, then diagnose + build
 python run.py add NVDA MSFT        # add tickers (each auto-diagnosed), rebuild
 python run.py remove NVDA          # drop a ticker, rebuild
-python run.py build                # rebuild dashboard from config.json
+python run.py build                # rebuild dashboard (auto: freeze recs + snapshot + review score)
+python run.py review               # intraday refresh: snapshot + score frozen cohorts + proposals
 python run.py diagnose NVDA        # print one stock's diagnosis JSON (no dashboard write)
 ```
+When the user asks to "refresh" during the day, prefer `review` (light) over `build` (full refetch).
+If `review` prints optimization proposals (they pass strict evidence gates and are NEVER auto-applied),
+relay them to the user with the evidence and ask whether to apply.
 Output: `dashboard.html` (self-contained, open in any browser). `config.json` holds the watchlist.
 
 ## How to drive it as an agent

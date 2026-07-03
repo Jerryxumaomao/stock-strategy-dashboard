@@ -64,6 +64,25 @@ overlapping samples, mostly one bull regime, survivor-biased ticker pool — cra
 | 🏔️ hold | strong secular uptrend where active trading keeps losing | accumulate cheap on pullbacks to 50/150/200MA | trim at prior high; exit on 200MA break | 200-day MA (**unlevered stock only** — never options) |
 | 🚫 avoid | none profitable (crashed / choppy / too new) | — (wait for VCP → breakout, or 200MA reclaim) | — | — |
 
+## Forward review & self-improvement loop (复盘优化)
+Every `build` automatically:
+1. **Freezes** the day's recommendations once (`history/recs-DATE.json`, idempotent — rerunning
+   intraday never duplicates samples, it only tightens that day's hi/lo snapshot);
+2. **Snapshots** each ticker's latest daily bar (`history/snap-DATE.json`, keyed by the bar's own
+   date so holidays never create empty cohorts);
+3. **Scores** every past cohort against what actually happened: forward return by strategy group,
+   buy-zone touch rate, stop-breach-after-touch rate, breakout fire rate;
+4. **Proposes** parameter changes ONLY past strict evidence gates (same issue in ≥2 non-overlapping
+   cohorts, ≥30 samples, cohorts ≥5 forward days) — and **never auto-applies**: proposals are
+   printed for the user to approve, so the system improves without silently overfitting itself.
+
+Run `python run.py review` for a lightweight intraday refresh (snapshot + score + proposals,
+no rebuild). The more often you run it, the more precise that day's hi/lo record becomes.
+
+Built-in proposal gates: buy zones posted too deep (price ran away untouched) · zones/stops too
+tight (filled then stopped) · strategy discrimination broken (active picks underperform the avoid
+bucket → re-diagnose the universe).
+
 ## Data sources
 Default: **Yahoo Finance** (`yfinance`, free, no account). Pluggable — implement `ibkr` /
 `tradingview` / your broker in [`lab/datasource.py`](lab/datasource.py) and set `"source"` in
