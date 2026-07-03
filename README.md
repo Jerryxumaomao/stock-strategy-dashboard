@@ -35,9 +35,25 @@ open dashboard.html                    # (or double-click) — self-contained
 
 ## What you get, per stock
 - **Strategy label**: 📉 dip-buy · 📈 breakout · 📈 breakout·wide-stop · 🏔️ hold · 🚫 avoid (+ reason bucket)
+- **Market-state light** (see below): 🔥 parabolic · 🔥 hot · ⚠️ breakdown · 🛡️ tight base · 😴 quiet · neutral —
+  with a contextual note **inside the entry/trim module explaining why to act or wait right now**
 - **Stage & volatility** (SEPA-style trend stage, annualized vol)
 - **Backtest**: win rate + expectancy (R) — or, for hold, total return / CAGR / max drawdown
 - **Actionable levels**: dip buy zones + stop · breakout trigger + stop · or hold buy-cheap zones + target + trend-exit
+
+## Market-state lights (precursor study)
+From a 39k sample-day study (46 tickers × 5y, 10-day forward window; baseline: surge ≥+20% 9.3%, crash ≤-20% 3.4%):
+
+| State (observable today) | Surge lift | Crash lift | What the dashboard tells you |
+|---|---|---|---|
+| 🔥 parabolic (20d>+40% & price>50MA×1.25) | 2.4× | **2.3×** | violence both ways → trim + tighten stops, never add; entries paused |
+| 🔥 hot (5d>+15%) | 1.9× | 2.2× | don't chase; holders may bank some |
+| ⚠️ breakdown (below 50MA & 20d<-15%) | 1.4× | **1.4×** | falling knife → entries paused until 50MA reclaimed |
+| 🛡️ tight base near highs (20d range<12%) | 0.15× | **≈0** | safest place to stage a position before a breakout |
+| 😴 quiet (vol<20th pct) | 0.7× | 0.55× | calm persists; execute plan unhurried |
+
+Key insight: **price signals predict the volatility state, not the direction.** Caveats: no volume data,
+overlapping samples, mostly one bull regime, survivor-biased ticker pool — crash lifts will be worse in a bear.
 
 ## Strategies
 | Strategy | For | Entry | Exit | Stop |

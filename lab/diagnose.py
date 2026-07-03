@@ -17,6 +17,42 @@ def _stage(C, n):
     return ("Stage2上升" if up else "Stage4下跌" if dn else "过渡/震荡"), s50, s200
 
 
+def market_state(bars):
+    """Volatility-state light, from a precursor study on 39k sample-days (46 tickers × 5y):
+    para (parabolic: 20d>+40% & price>50MA×1.25) → BOTH surge & crash odds ×2.3 (violence, trim/tighten);
+    brk (below 50MA & 20d<-15%) → crash continuation ×1.38 (don't catch the knife);
+    hot (5d>+15%) → crash ×2.2 (don't chase); tight (20d range<12% near highs) → 10d crash ≈0 (safe to stage);
+    quiet (vol<20th pct) → calm persists. Priority: para > brk > hot > tight > quiet > neutral."""
+    import statistics as _st
+    n = len(bars)
+    if n < 270:
+        return None
+    C = [b["c"] for b in bars]; H = [b["h"] for b in bars]; L = [b["l"] for b in bars]
+    i = n - 1
+    s50 = sma(C, 50, i)
+    if not s50:
+        return None
+    ret20 = C[i] / C[i - 20] - 1; ret5 = C[i] / C[i - 5] - 1
+    ext = C[i] / s50 - 1
+    rng20 = (max(H[i - 19:i + 1]) - min(L[i - 19:i + 1])) / C[i]
+    hi252 = max(H[i - 251:i + 1])
+    vols = []
+    for k in range(i - 252, i + 1):
+        if k < 21:
+            continue
+        rets = [C[m] / C[m - 1] - 1 for m in range(k - 19, k + 1)]
+        vols.append(_st.pstdev(rets))
+    v = vols[-1]; volp = sum(1 for x in vols if x <= v) / len(vols)
+    if ret20 > 0.40 and C[i] > s50 * 1.25: st = "para"
+    elif C[i] < s50 and ret20 < -0.15: st = "brk"
+    elif ret5 > 0.15: st = "hot"
+    elif rng20 < 0.12 and C[i] >= hi252 * 0.85: st = "tight"
+    elif volp < 0.20: st = "quiet"
+    else: st = "neutral"
+    return {"st": st, "ret20": round(ret20 * 100), "ret5": round(ret5 * 100),
+            "ext": round(ext * 100), "rng20": round(rng20 * 100), "volp": round(volp * 100)}
+
+
 def diagnose(ticker, bars, name=None):
     n = len(bars)
     C = [b["c"] for b in bars]; H = [b["h"] for b in bars]; L = [b["l"] for b in bars]
@@ -28,7 +64,8 @@ def diagnose(ticker, bars, name=None):
     pct_from_high = round((last - hi252) / hi252 * 100, 1)
 
     rec = {"ticker": ticker, "name": name or ticker, "last": round(last, 2), "chg": chg,
-           "stage": stage, "vol": vol, "pct_from_high": pct_from_high, "bars": n}
+           "stage": stage, "vol": vol, "pct_from_high": pct_from_high, "bars": n,
+           "state": market_state(bars)}
 
     if n < 250:
         rec.update({"strategy": "avoid", "bucket": "历史不足·新标的",

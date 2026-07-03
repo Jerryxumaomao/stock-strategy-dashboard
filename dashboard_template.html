@@ -40,6 +40,9 @@ footer b{color:#e8e0d2}
 <script>
 const PAYLOAD=/*__DATA__*/{};
 const SLAB={brk:['📈 宜突破','c-brk'],brk_atr:['📈 突破·宽止损','c-brk'],hold:['🏔️ 长持','c-hold'],dip:['📉 宜抄底','c-dip'],dip_re:['📉 抄底+再进','c-dip'],avoid:['🚫 回避','c-avoid']};
+const STL={para:['🔥抛物线','#faeceb','#c64545'],hot:['🔥过热','#faeceb','#c64545'],brk:['⚠️破位','#f8f1df','#b07d0a'],tight:['🛡️紧平台','#e9f5ee','#217a44'],quiet:['😴安静','#efe9de','#6c6a64'],neutral:['·常态','#efe9de','#6c6a64']};
+function stChip(r){var s=r.state;if(!s||!STL[s.st])return '';var x=STL[s.st];return ' <span class="chip" style="background:'+x[1]+';color:'+x[2]+'">'+x[0]+'</span>'}
+function stAdv(r){var s=r.state;if(!s)return '';var t={para:'🔥抛物线(20日+'+s.ret20+'%、超50MA '+s.ext+'%):10日暴涨/暴跌概率均×2.3——持有者减仓+收紧止损、勿加仓;买入计划暂停',hot:'🔥短期过热(5日+'+s.ret5+'%):10日暴跌概率×2.2——别追高,等回踩;持有者可先兑现一部分',brk:'⚠️破位(50MA下、20日'+s.ret20+'%):跌势延续概率×1.38——买入暂停、不接飞刀;持有者反抽即减',tight:'🛡️紧平台近高(20日区间'+s.rng20+'%):10日暴跌概率≈0——埋伏安全,分批建仓等突破',quiet:'😴低波动安静:大概率延续,按计划执行'}[s.st]||'';return t?'<div style="margin-top:6px;font-size:11px;color:#3d3d3a;border-top:1px dashed #e6dfd8;padding-top:5px">'+t+'</div>':''}
 const $=id=>document.getElementById(id);
 $('ttl').textContent=PAYLOAD.title||'Stock Strategy Dashboard';
 $('sub').textContent='更新 '+PAYLOAD.as_of+' · 数据源 '+PAYLOAD.source+' · '+PAYLOAD.tickers.length+' 只 · 决策辅助非投资建议';
@@ -50,10 +53,10 @@ function sigHtml(r){var s=r.signal;if(!s||!s.type)return '';
  if(s.type==='hold')return '<div class="sig"><div class="t" style="color:#2f7d6b">🏔️ 长持·买便宜(正股·不加杠杆)</div>回踩买入 '+s.buy_zones.map(money).join(' / ')+'<br>目标 '+s.target.map(money).join(' / ')+' · 破 '+money(s.trend_stop)+'(200日线)离场</div>';
  return '<div class="sig"><div class="t" style="color:var(--primary)">📉 分批买入区</div>'+s.buy_zones.map(money).join(' / ')+' · 止损 '+money(s.stop)+'<br><span style="color:var(--dim)">'+(s.note||'')+'</span></div>';}
 function card(r){var sl=SLAB[r.strategy]||SLAB.avoid;var cc=r.chg>=0?'up':'down';
- return '<div class="card"><div class="top"><div><div class="sym">'+r.ticker+'</div><div class="nm">'+r.stage+' · 波动'+r.vol+'%</div><div><span class="chip '+sl[1]+'">'+sl[0]+'</span></div></div>'+
+ return '<div class="card"><div class="top"><div><div class="sym">'+r.ticker+'</div><div class="nm">'+r.stage+' · 波动'+r.vol+'%</div><div><span class="chip '+sl[1]+'">'+sl[0]+'</span>'+stChip(r)+'</div></div>'+
  '<div><div class="p">'+money(r.last)+'</div><div class="'+cc+'" style="font-size:12px;font-weight:600;text-align:right">'+(r.chg>=0?'▲':'▼')+' '+r.chg+'%</div></div></div>'+
  '<div class="rows"><div class="row"><span class="k">距52周高</span><span class="down">'+r.pct_from_high+'%</span></div>'+(r.bucket?'<div class="row"><span class="k">类别</span><span>'+r.bucket+'</span></div>':'')+'</div>'+
- sigHtml(r)+(bt(r)?'<div class="bt">'+bt(r)+'</div>':'')+(r.action?'<div class="act">'+r.action+'</div>':'')+'</div>';}
+ sigHtml(r)+stAdv(r)+(bt(r)?'<div class="bt">'+bt(r)+'</div>':'')+(r.action?'<div class="act">'+r.action+'</div>':'')+'</div>';}
 const order=['brk','brk_atr','dip','dip_re','hold','avoid'];const secName={brk:'📈 宜突破',brk_atr:'📈 突破·宽止损',hold:'🏔️ 长持(正股)',dip:'📉 宜抄底',dip_re:'📉 抄底+再进',avoid:'🚫 回避'};
 const byS={};PAYLOAD.tickers.forEach(r=>{(byS[r.strategy]=byS[r.strategy]||[]).push(r)});
 $('counts').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="count">'+secName[s]+' '+byS[s].length+'</div>').join('');

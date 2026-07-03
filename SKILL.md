@@ -42,8 +42,10 @@ Output: `dashboard.html` (self-contained, open in any browser). `config.json` ho
 1. If the user has no watchlist yet, **ask them which tickers to track**, write them to
    `config.json` (`watchlist`), then run `python run.py build`.
 2. To analyze one stock quickly, run `python run.py diagnose TICKER` and summarize the JSON:
-   its **strategy** (dip/breakout/avoid), **stage**, **volatility**, backtest **win rate/expectancy**,
-   and the concrete **buy/breakout + stop levels** in `signal`.
+   its **strategy** (dip/breakout/hold/avoid), **stage**, **volatility**, backtest **win rate/expectancy**,
+   the concrete **buy/breakout + stop levels** in `signal`, and the **market-state light** in `state`
+   (para/hot/brk/tight/quiet — tells the user whether to act on the levels NOW or wait: parabolic/hot →
+   pause entries & trim, breakdown → don't catch the knife, tight base → safe to stage, quiet → proceed).
 3. When the user adds a stock, run `python run.py add TICKER` — it is diagnosed automatically.
 4. Point the user to the generated `dashboard.html`, and relay the per-stock strategy + levels.
 
