@@ -30,8 +30,15 @@ python run.py init                     # enter your watchlist
 python run.py diagnose NVDA            # one-stock diagnosis
 python run.py add PLTR                 # add a stock (auto-diagnosed)
 python run.py build                    # rebuild dashboard.html
+python run.py options NVDA             # options: vol cone + implied-vs-realized + 4-bucket
+                                       #   candidates (lottery gated, 45-90d main, LEAPS)
+python run.py audit                    # discipline score: your real trades vs frozen recs
 open dashboard.html                    # (or double-click) — self-contained
 ```
+Set `capital` and `risk_pct` in `config.json` — every signal then shows a **position size**
+(risk budget ÷ stop distance). For `audit`, export your fills to `history/trades.json`
+(format documented in `lab/audit.py`) — execution drift, not signal quality, is usually
+the biggest leak, and this makes it a number.
 
 ## What you get, per stock
 - **Strategy label**: 📉 dip-buy · 📈 breakout · 📈 breakout·wide-stop · 🏔️ hold · 🚫 avoid (+ reason bucket)

@@ -37,6 +37,10 @@ python run.py build                # rebuild dashboard (auto: freeze recs + snap
 python run.py review               # intraday refresh: snapshot + score frozen cohorts + proposals
 python run.py diagnose NVDA        # print one stock's diagnosis JSON (no dashboard write)
 ```
+`options TICKER` gives an options assessment (imp/real vol-tax verdict + bucketed contract
+candidates with empirical EV — relay the gates: rich vol = spreads only, lottery only if admitted).
+`audit` scores the user's real fills (history/trades.json) against frozen recs — relay the
+discipline score and the specific violating trades; this is usually the user's biggest leak.
 When the user asks to "refresh" during the day, prefer `review` (light) over `build` (full refetch).
 If `review` prints optimization proposals (they pass strict evidence gates and are NEVER auto-applied),
 relay them to the user with the evidence and ask whether to apply.
