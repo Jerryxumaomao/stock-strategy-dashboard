@@ -10,6 +10,7 @@ CLI for stock-strategy-dashboard.
   python run.py diagnose NVDA        print one ticker's diagnosis (no dashboard write)
   python run.py options NVDA MU      options: vol cone + implied-vs-realized + 4-bucket candidates
   python run.py audit                score real trades (history/trades.json) vs frozen recs
+  python run.py movers               market-wide movers radar: gainers/losers/actives + options UOA
 
 Data source defaults to Yahoo Finance (free). Change "source" in config.json.
 """
@@ -108,6 +109,17 @@ def main():
         rep = audit_trades(json.load(open(fp, encoding="utf-8")), hist, cfg.get("capital", 10000))
         print(f"纪律分 {rep['discipline_score']}/100 · scored {rep['n_scored']} · drift ${rep['drift_cost']}")
         for r in rep["rows"]: print(" ", r["date"], r["verdict"], r["sym"], r["side"], r["px"], r["why"], f"(pnl {r['pnl']})")
+    elif cmd == "movers":
+        from lab.movers import get_movers
+        m = get_movers()
+        for k in ["day_gainers", "day_losers", "most_actives"]:
+            rows = m["movers"].get(k)
+            print(f"== {k} ==")
+            if isinstance(rows, list):
+                for r in rows[:10]: print(f"  {r['s']:6} {r['chg']:>6}%  volx {r['volx']}  ${r['px']}  {r['n']}")
+            else: print(" ", rows)
+        print("== options UOA (vol>=3x OI) ==")
+        for u in m["uoa"]: print(f"  {u['t']:6} {u['kind']} {u['expiry']} ${u['k']}  vol {u['vol']} / oi {u['oi']} = {u['ratio']}x  ${u['prem_m']}M")
     else: print(__doc__)
 
 

@@ -62,5 +62,13 @@ const order=['brk','brk_atr','dip','dip_re','hold','avoid'];const secName={brk:'
 const byS={};PAYLOAD.tickers.forEach(r=>{(byS[r.strategy]=byS[r.strategy]||[]).push(r)});
 $('counts').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="count">'+secName[s]+' '+byS[s].length+'</div>').join('');
 $('body').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="sec">'+secName[s]+'</div><div class="grid">'+byS[s].map(card).join('')+'</div>').join('');
+/* market-wide movers radar (zero-cost local scan) */
+(function(){var M=PAYLOAD.movers;if(!M)return;var watch=new Set(PAYLOAD.tickers.map(r=>r.ticker));
+ function tbl(rows,title){if(!Array.isArray(rows)||!rows.length)return '';
+  var tr=rows.map(r=>'<tr'+(r.volx>=3?' style="background:#f9ede8"':'')+'><td><b>'+r.s+'</b>'+(watch.has(r.s)?' <span style="font-size:9px;color:var(--primary)">自选</span>':'')+'</td><td style="text-align:left;font-size:10.5px;color:#6c6a64">'+r.n+'</td><td>$'+r.px+'</td><td class="'+(r.chg>=0?'up':'down')+'">'+(r.chg>=0?'+':'')+r.chg+'%</td><td>'+(r.volx==null?'—':r.volx+'x')+'</td></tr>').join('');
+  return '<div class="sec">'+title+'</div><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:#6c6a64"><th>票</th><th style="text-align:left">名称</th><th>价</th><th>涨跌</th><th>量比</th></tr></thead><tbody>'+tr+'</tbody></table>';}
+ var uoa='';
+ if(M.uoa&&M.uoa.length){uoa='<div class="sec">🐋 期权异动 UOA(成交≥3×OI)</div><table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>'+M.uoa.map(u=>'<tr><td><b>'+u.t+'</b></td><td>'+(u.kind==='C'?'📈C':'📉P')+'</td><td>'+u.expiry+'</td><td>$'+u.k+'</td><td>'+u.vol.toLocaleString()+'/'+u.oi.toLocaleString()+'='+u.ratio+'x</td><td>$'+u.prem_m+'M</td></tr>').join('')+'</tbody></table><div style="font-size:11px;color:#6c6a64;margin-top:6px">UOA分不出买卖方向(需逐笔数据),近到期大单可能是做市对冲——参考方向,勿直接抄单。</div>';}
+ document.getElementById('body').insertAdjacentHTML('beforeend','<div class="sec" style="margin-top:26px">📡 全市场异动雷达('+M.as_of+' · 延迟~15分钟 · 高亮=量比≥3)</div>'+tbl(M.movers.day_gainers,'📈 涨幅榜')+tbl(M.movers.day_losers,'📉 跌幅榜')+tbl(M.movers.most_actives,'🔥 成交活跃')+uoa);})();
 $('foot').innerHTML='<b>方法:</b> 每只票诊断趋势阶段/波动率,回测"回踩抄底"与"突破追涨"两策略,分配历史正期望者(否则回避并给类别对策);出场跟随SMA50让赢家跑。<br><b>诚实:</b> 规则代理非严格缠论,样本内、历史不代表未来,价值在验证期望与纪律。非投资建议。';
 </script></body></html>

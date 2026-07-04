@@ -61,6 +61,13 @@ def render(results, cfg):
                "capital": cfg.get("capital", 10000),
                "risk_pct": cfg.get("risk_pct", 1.5),
                "tickers": results}
+    if cfg.get("movers", True):
+        try:
+            from .movers import get_movers
+            payload["movers"] = get_movers()
+            print("[movers] market radar scanned")
+        except Exception as e:
+            print("[movers] skipped:", e)
     html = tmpl.replace("/*__DATA__*/", json.dumps(payload, ensure_ascii=False))
     out = os.path.join(ROOT, "dashboard.html")
     with open(out, "w", encoding="utf-8") as f:
