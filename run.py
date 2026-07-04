@@ -38,12 +38,22 @@ def _cfg():
 
 
 def cmd_init():
-    print("== 初始化 == 输入你要盯的股票代码,空格或逗号分隔(如: NVDA AMD MU TSM):")
+    print("== 初始化 · Step 1/2 选择数据源 ==")
+    print("  1. yahoo(默认)— 免费、无需账号;行情延迟约15分钟,期权链质量一般")
+    print("  2. ibkr — 券商实时数据(含实时期权链/IV/盘口)。质量最佳,但需要券商账户,")
+    print("            且实时行情订阅可能产生费用(如 IBKR 的 OPRA/美股包,通常每月几美元)")
+    print("  3. tradingview — 同为扩展位,需自行接入")
+    print("  提示:2/3 需在 lab/datasource.py 实现接入函数;未接入前建议先用 yahoo 跑通。")
+    src = input("选择 1/2/3(回车=1)> ").strip()
+    source = {"1": "yahoo", "2": "ibkr", "3": "tradingview", "": "yahoo"}.get(src, "yahoo")
+    if source != "yahoo":
+        print(f"[注意] 已选 {source}:请在 lab/datasource.py 完成接入;实时行情订阅可能产生券商费用。")
+    print("== 初始化 · Step 2/2 输入你要盯的股票代码,空格或逗号分隔(如: NVDA AMD MU TSM):")
     raw = input("> ").replace(",", " ").split()
     tickers = [t.strip().upper() for t in raw if t.strip()]
     if not tickers:
         print("未输入,退出。"); return
-    cfg = _cfg(); cfg["watchlist"] = sorted(set(tickers)); _save(cfg)
+    cfg = _cfg(); cfg["watchlist"] = sorted(set(tickers)); cfg["source"] = source; _save(cfg)
     print(f"已保存 {len(cfg['watchlist'])} 只。开始诊断+构建 ...")
     build(cfg)
 

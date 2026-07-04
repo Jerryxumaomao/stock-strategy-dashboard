@@ -90,10 +90,17 @@ Built-in proposal gates: buy zones posted too deep (price ran away untouched) ·
 tight (filled then stopped) · strategy discrimination broken (active picks underperform the avoid
 bucket → re-diagnose the universe).
 
-## Data sources
-Default: **Yahoo Finance** (`yfinance`, free, no account). Pluggable — implement `ibkr` /
-`tradingview` / your broker in [`lab/datasource.py`](lab/datasource.py) and set `"source"` in
-`config.json`.
+## Data sources — pick your trade-off at `init`
+`python run.py init` asks you to choose:
+
+| Source | Cost | Quality |
+|---|---|---|
+| **yahoo** (default) | Free, no account | ~15-min delayed quotes; option chains OK but not pristine |
+| **broker (ibkr / tradingview / yours)** | Broker account; real-time market-data subscriptions **may incur fees** (e.g. IBKR OPRA/US bundles, a few $/month) | Real-time quotes, live option chains / IV / order book — best for the options module |
+
+Recommendation: start free on Yahoo to try everything; wire in your broker via
+[`lab/datasource.py`](lab/datasource.py) (implement one function, set `"source"` in
+`config.json`) when you want real-time precision — especially for options scanning.
 
 ## Layout
 ```

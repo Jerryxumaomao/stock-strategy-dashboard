@@ -47,8 +47,11 @@ relay them to the user with the evidence and ask whether to apply.
 Output: `dashboard.html` (self-contained, open in any browser). `config.json` holds the watchlist.
 
 ## How to drive it as an agent
-1. If the user has no watchlist yet, **ask them which tickers to track**, write them to
-   `config.json` (`watchlist`), then run `python run.py build`.
+1. If the user has no watchlist yet, first **ask which data source they want**: free Yahoo
+   (no account, ~15-min delay) or their broker's real-time feed (better quality — especially
+   for options — but market-data subscriptions **may incur fees**; needs wiring in
+   `lab/datasource.py`). Default to yahoo. Then **ask which tickers to track**, write both to
+   `config.json` (`source`, `watchlist`), then run `python run.py build`.
 2. To analyze one stock quickly, run `python run.py diagnose TICKER` and summarize the JSON:
    its **strategy** (dip/breakout/hold/avoid), **stage**, **volatility**, backtest **win rate/expectancy**,
    the concrete **buy/breakout + stop levels** in `signal`, and the **market-state light** in `state`
