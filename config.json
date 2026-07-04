@@ -1,5 +1,7 @@
 {
   "title": "我的策略看板",
   "source": "yahoo",
+  "capital": 10000,
+  "risk_pct": 1.5,
   "watchlist": ["NVDA", "MU", "TSM", "CIEN", "MRVL", "ARM", "AMD", "OKLO", "IREN", "CRDO"]
 }

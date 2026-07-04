@@ -8,6 +8,8 @@ CLI for stock-strategy-dashboard.
   python run.py build                rebuild dashboard from config.json (auto: freeze + review)
   python run.py review               intraday refresh: snapshot + score cohorts + check proposals
   python run.py diagnose NVDA        print one ticker's diagnosis (no dashboard write)
+  python run.py options NVDA MU      options: vol cone + implied-vs-realized + 4-bucket candidates
+  python run.py audit                score real trades (history/trades.json) vs frozen recs
 
 Data source defaults to Yahoo Finance (free). Change "source" in config.json.
 """
@@ -82,6 +84,20 @@ def main():
         from lab.review import run_review
         run_review(_cfg(), ROOT, do_snapshot=True)
     elif cmd == "diagnose": cmd_diagnose(args)
+    elif cmd == "options":
+        from lab.options import assess_options
+        cfg = _cfg()
+        for t in [a.upper() for a in args] or cfg.get("watchlist", [])[:3]:
+            bars = get_history(t, source=cfg.get("source", "yahoo"))
+            print(json.dumps(assess_options(t, bars, cfg.get("capital", 10000)), ensure_ascii=False, indent=1))
+    elif cmd == "audit":
+        from lab.audit import audit_trades
+        cfg = _cfg(); hist = os.path.join(ROOT, "history")
+        fp = os.path.join(hist, "trades.json")
+        if not os.path.exists(fp): print("no history/trades.json — export trades from your broker first"); return
+        rep = audit_trades(json.load(open(fp, encoding="utf-8")), hist, cfg.get("capital", 10000))
+        print(f"纪律分 {rep['discipline_score']}/100 · scored {rep['n_scored']} · drift ${rep['drift_cost']}")
+        for r in rep["rows"]: print(" ", r["date"], r["verdict"], r["sym"], r["side"], r["px"], r["why"], f"(pnl {r['pnl']})")
     else: print(__doc__)
 
 

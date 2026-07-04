@@ -58,6 +58,8 @@ def render(results, cfg):
     payload = {"title": cfg.get("title", "Stock Strategy Dashboard"),
                "as_of": time.strftime("%Y-%m-%d %H:%M"),
                "source": cfg.get("source", "yahoo"),
+               "capital": cfg.get("capital", 10000),
+               "risk_pct": cfg.get("risk_pct", 1.5),
                "tickers": results}
     html = tmpl.replace("/*__DATA__*/", json.dumps(payload, ensure_ascii=False))
     out = os.path.join(ROOT, "dashboard.html")
