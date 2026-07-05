@@ -1,7 +1,19 @@
 # AGENTS.md — Operations guide for AI agents driving this skill
 
-Read this BEFORE running anything. Follow the recipes; don't improvise. If something
-isn't covered here, ask the user instead of guessing.
+Read this BEFORE running anything. Weak models: follow the recipes literally. Strong
+models: every rule below carries its WHY — the incident, evidence, or theory behind it —
+plus explicit guidance on when deviation is legitimate. Understand the why before you
+consider bending anything; if a situation isn't covered, ask the user.
+
+## Why this system is built the way it is (read this first)
+The entire value of this tool is that **its numbers are real and its improvements are
+evidence-gated**. Its history is a string of plausible ideas that FAILED when tested:
+tightening entry rules made results worse; the Chandelier exit lost to the simple SMA50
+trail; "NVDA options look fair" was an artifact of trend bias until EV was de-trended.
+And ideas that survived testing became rules: per-ticker strategy assignment, ATR-wide
+stops for high-vol names, the 37%/z-target exits for fixed-deadline positions.
+So the meta-rule is: **intuition proposes, backtests dispose, forward review is the
+final judge.** Everything below derives from that.
 
 ## What this is
 A stock/options strategy dashboard engine. It diagnoses every ticker in a watchlist,
@@ -25,25 +37,60 @@ dashboard_template.html              render template (payload injected at /*__DA
 history/               recs-*.json (frozen recommendations), snap-*.json, trades.json — user data, gitignored
 ```
 
-## 🔴 Hard rules
-1. **Never place trades or move money.** This tool analyzes; the user executes. Every
-   summary you give ends with a not-investment-advice note.
-2. **`history/recs-*.json` are immutable.** They are the ground truth for forward review.
-   Freezing is once per day and idempotent (build handles it) — never hand-edit or re-freeze.
-3. **Proposals are never auto-applied.** If `review`/`build` prints optimization proposals,
-   relay them verbatim with the evidence and ask the user to approve. One change per cycle.
-4. **Never fabricate numbers.** Every figure you report must come from actual script output.
-   If a fetch fails, a sample is small, or data is missing — say so plainly.
-5. **Free text going into the dashboard payload must not contain raw `<` or `>`**
-   (breaks the HTML). Use full-width ＜＞ or words.
-6. **Before committing code changes:** `python -m py_compile run.py lab/*.py` then a full
-   `python run.py build` must succeed end-to-end.
-7. **Match exit rules to time structure** (documented in README): options / fixed-deadline
-   positions use the z-target (2.33σ√t) or 37% secretary rule; open-ended stock positions
-   use the SMA50 trail. Don't swap them.
-8. **Data honesty to the user:** yahoo quotes are ~15-min delayed; option EV is de-trended
-   empirical (assumes history rhymes; survivor bias on big winners); state lights predict
-   the *volatility regime*, not direction.
+## 🔴 Hard rules — each with its WHY and deviation guidance
+
+1. **Never place trades or move money.**
+   *Why:* an agent error here causes irreversible financial loss; analysis errors are
+   recoverable, execution errors are not. Also keeps the tool legally clean (not advice).
+   *Deviation:* never. Not even with user permission — tell them to execute themselves.
+
+2. **`history/recs-*.json` are immutable; freeze once per day (build handles it).**
+   *Why:* forward review is the ONLY unbiased judge of the system (backtests are in-sample
+   and survivor-biased). Editing a frozen rec — even to "fix" it — is retroactive
+   self-deception: the score stops measuring what the system actually said. Multiple
+   freezes per day pseudo-replicate samples and corrupt the statistics.
+   *Deviation:* schema upgrades on TODAY's freeze before market close are acceptable
+   (same levels, richer fields). Past days: never.
+
+3. **Optimization proposals are never auto-applied; relay with evidence, one change/cycle.**
+   *Why:* with dozens of tracked metrics, something always looks significant by chance
+   (multiple comparisons). Auto-applying lets noise rewrite the strategy, and silent
+   changes destroy the user's trust and the audit trail. One change per cycle keeps
+   cause-and-effect attributable. Precedent: the v2 "obvious improvements" (tighter
+   entries, break-even stops) all tested WORSE — plausibility is not evidence.
+   *Deviation:* none for parameter changes. Re-diagnosis on fresh data is not a
+   "change" — it's scheduled refresh (monthly), and even that gets reported.
+
+4. **Never fabricate numbers; report failures and small samples plainly.**
+   *Why:* the product IS the numbers. One invented figure poisons every real one, and the
+   user makes real-money decisions on them. Small n presented confidently is fabrication's
+   polite cousin — a n=2 "3.29R expectancy" once nearly misclassified a ticker until
+   shrinkage was added.
+   *Deviation:* never. "The fetch failed / n is too small to conclude" is a fully valid answer.
+
+5. **No raw `<` or `>` in free text entering the dashboard payload.**
+   *Why:* the browser parses them as HTML tags. This once silently nested every card into
+   the previous one and broke the whole page — and it looked like a CSS bug for hours.
+   *Deviation:* none needed; full-width ＜＞ or words express the same thing.
+
+6. **Before committing: `py_compile` all modules + one full successful `run.py build`.**
+   *Why:* build is the integration test — it exercises fetch, diagnose, radars, render,
+   freeze and review in one pass. Skipping it has shipped broken dashboards before.
+   *Deviation:* docs-only changes may skip the build, never the commit message honesty.
+
+7. **Match exit rules to the position's time structure.**
+   *Why (this is empirical, not aesthetic):* on open-ended stock positions the SMA50 trail
+   earned +1.01R because winners could run for months; in fixed 25-day windows (options)
+   the trail can't develop and LOST to the z-target 2.33σ√t (+0.31R) and the 37% secretary
+   rule (+0.29R, 1,062 samples) — a deadline changes the optimal stopping problem itself.
+   *Deviation:* if you have NEW backtest evidence on this repo's data, propose it (rule 3).
+
+8. **Data honesty to the user, every time it's relevant:** yahoo quotes ~15-min delayed;
+   option EV is de-trended empirical (assumes history rhymes; survivor bias on big
+   winners); state lights predict the *volatility regime*, not direction (the precursor
+   study found parabolic states lift BOTH surge and crash odds ~2.3×).
+   *Why:* overstating precision is how users get hurt on your watch.
+   *Deviation:* never on the caveats; brevity is fine, omission is not.
 
 ## Recipes
 ### First-time setup (`init` or when user has no config)
