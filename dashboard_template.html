@@ -57,7 +57,7 @@ function sigHtml(r){var s=r.signal;if(!s||!s.type)return '';
  if(s.type==='hold')return '<div class="sig"><div class="t" style="color:#2f7d6b">🏔️ 长持·买便宜(正股·不加杠杆)</div>回踩买入 '+s.buy_zones.map(money).join(' / ')+'<br>目标 '+s.target.map(money).join(' / ')+' · 破 '+money(s.trend_stop)+'(200日线)离场'+posSize(s.buy_zones[0],s.trend_stop)+'</div>';
  return '<div class="sig"><div class="t" style="color:var(--primary)">📉 分批买入区</div>'+s.buy_zones.map(money).join(' / ')+' · 止损 '+money(s.stop)+'<br><span style="color:var(--dim)">'+(s.note||'')+'</span>'+posSize(s.buy_zones[0],s.stop)+'</div>';}
 function card(r){var sl=SLAB[r.strategy]||SLAB.avoid;var cc=r.chg>=0?'up':'down';
- return '<div class="card"><div class="top"><div><div class="sym">'+r.ticker+'</div><div class="nm">'+r.stage+' · 波动'+r.vol+'%</div><div><span class="chip '+sl[1]+'">'+sl[0]+'</span>'+stChip(r)+'</div></div>'+
+ return '<div class="card" data-sym="'+r.ticker+'"><div class="top"><div><div class="sym">'+r.ticker+'</div><div class="nm">'+r.stage+' · 波动'+r.vol+'%</div><div><span class="chip '+sl[1]+'">'+sl[0]+'</span>'+stChip(r)+'</div></div>'+
  '<div><div class="p">'+money(r.last)+'</div><div class="'+cc+'" style="font-size:12px;font-weight:600;text-align:right">'+(r.chg>=0?'▲':'▼')+' '+r.chg+'%</div></div></div>'+
  '<div class="rows"><div class="row"><span class="k">距52周高</span><span class="down">'+r.pct_from_high+'%</span></div>'+(r.bucket?'<div class="row"><span class="k">类别</span><span>'+r.bucket+'</span></div>':'')+'</div>'+
  sigHtml(r)+stAdv(r)+(bt(r)?'<div class="bt">'+bt(r)+'</div>':'')+(r.action?'<div class="act">'+r.action+'</div>':'')+'</div>';}
@@ -67,6 +67,40 @@ $('counts').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="count">'+secNa
 (function(){var mk=PAYLOAD.market;if(mk){$('counts').insertAdjacentHTML('beforebegin','<div style="padding:9px 14px;border-radius:10px;margin-bottom:10px;font-weight:700;font-size:13px;background:'+(mk.above?'#e9f5ee;color:#217a44':'#faeceb;color:#c64545')+'">'+(mk.above?'🟢 大盘开关:SPY $'+mk.spy+' 在200日线上(+'+mk.pct+'%)——允许追涨/正常仓位':'🔴 大盘开关:SPY $'+mk.spy+' 破200日线('+mk.pct+'%)——禁突破追涨·仓位减半')+'</div>');}
  var cl=PAYLOAD.clusters;if(cl&&cl.length){$('counts').insertAdjacentHTML('afterend','<div style="font-size:11px;color:#6c6a64;margin-bottom:8px">⚠️ 相关簇(120日corr&gt;0.7,同簇≈同一注,每簇限1-2仓):'+cl.map(c=>'['+c.join(' ')+']').join(' · ')+'</div>');}})();
 $('body').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="sec">'+secName[s]+'</div><div class="grid">'+byS[s].map(card).join('')+'</div>').join('');
+/* quick filters + search (own row, sticky) */
+(function(){
+ var bar=document.createElement('div');
+ bar.style.cssText='position:sticky;top:0;background:var(--bg,#faf9f5);z-index:9;padding:8px 0;border-bottom:1px solid #e6dfd8;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px';
+ bar.innerHTML='<input id="qsearch" placeholder="搜索代码…" style="background:#fffdf7;border:1px solid #e6dfd8;padding:6px 12px;border-radius:8px;font-size:12px;width:130px">'
+  +'<span style="flex-basis:100%;height:0"></span>'
+  +'<span style="font-size:11px;color:#6c6a64;font-weight:600">一键筛选:</span>'
+  +'<button class="qbtn" data-q="near" style="background:#e9f5ee;border:1px solid rgba(33,122,68,.35);color:#217a44;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer">🟢 接近买点</button>'
+  +'<button class="qbtn" data-q="at" style="background:#e9f5ee;border:1px solid rgba(33,122,68,.35);color:#217a44;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer">🎯 达到买点</button>'
+  +(PAYLOAD.top10?'<button class="qbtn" data-q="cheap" style="background:#e9f5ee;border:1px solid rgba(33,122,68,.35);color:#217a44;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer">💎 Top10期权票</button>':'');
+ document.getElementById('body').insertAdjacentElement('beforebegin',bar);
+ var byT={};PAYLOAD.tickers.forEach(r=>byT[r.ticker]=r);
+ function dist(r){var s=r.signal||{};
+  if(s.type==='breakout')return (s.trigger-r.last)/r.last*100;
+  var z=(s.buy_zones&&s.buy_zones[0]);return z?(r.last-z)/z*100:null;}
+ function match(t,m){var r=byT[t];if(!r)return false;
+  if(m==='cheap')return (PAYLOAD.top10||[]).some(x=>x.t===t);
+  var d=dist(r);if(d===null)return false;
+  return m==='at'?d<=1:(d>1&&d<=6);}
+ function apply(m,q){document.querySelectorAll('#body .card').forEach(c=>{
+   var ok=(!q||c.dataset.sym.includes(q))&&(!m||match(c.dataset.sym,m));c.style.display=ok?'':'none';});
+  document.querySelectorAll('#body .sec').forEach(sec=>{var g=sec.nextElementSibling;
+   if(!g||!g.classList||!g.classList.contains('grid'))return;
+   var any=[...g.children].some(c=>c.style.display!=='none');
+   sec.style.display=any?'':'none';g.style.display=any?'':'none';});}
+ var mode=null;
+ bar.addEventListener('click',e=>{var b=e.target.closest('.qbtn');if(!b)return;
+  var was=b.style.background==='rgb(33, 122, 68)';
+  bar.querySelectorAll('.qbtn').forEach(x=>{x.style.background='#e9f5ee';x.style.color='#217a44';});
+  mode=was?null:b.dataset.q;
+  if(!was){b.style.background='#217a44';b.style.color='#fff';}
+  apply(mode,document.getElementById('qsearch').value.toUpperCase().trim());});
+ document.getElementById('qsearch').addEventListener('input',e=>apply(mode,e.target.value.toUpperCase().trim()));
+})();
 /* market-wide movers radar (zero-cost local scan) */
 (function(){var M=PAYLOAD.movers;if(!M)return;var watch=new Set(PAYLOAD.tickers.map(r=>r.ticker));
  function tbl(rows,title){if(!Array.isArray(rows)||!rows.length)return '';
