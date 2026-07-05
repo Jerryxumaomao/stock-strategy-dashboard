@@ -9,6 +9,7 @@ CLI for stock-strategy-dashboard.
   python run.py review               intraday refresh: snapshot + score cohorts + check proposals
   python run.py diagnose NVDA        print one ticker's diagnosis (no dashboard write)
   python run.py options NVDA MU      options: vol cone + implied-vs-realized + 4-bucket candidates
+  python run.py top10                daily Top-10 buy-worthy options across the pool (real quotes)
   python run.py audit                score real trades (history/trades.json) vs frozen recs
   python run.py movers               market-wide movers radar: gainers/losers/actives + options UOA
   python run.py darkpool             FINRA dark-pool SVR radar for your watchlist (free, daily)
@@ -98,6 +99,15 @@ def main():
         from lab.review import run_review
         run_review(_cfg(), ROOT, do_snapshot=True)
     elif cmd == "diagnose": cmd_diagnose(args)
+    elif cmd == "top10":
+        from lab.options import top_contracts
+        from lab.datasource import get_history as gh
+        cfg = _cfg()
+        rows = top_contracts(cfg.get("watchlist", []), lambda t: gh(t, source=cfg.get("source", "yahoo")), cfg.get("capital", 10000))
+        print("每日Top10期权(真实链报价·去趋势EV排序·即使全贵也排最不差):")
+        for i, r in enumerate(rows):
+            print(f" #{i+1} {r['t']:6} {r['bucket']:12} {r['expiry']} K={r['K']} mid=${r['mid']} EV{r['EV_pct']}% 胜率{r['P_win']}% "
+                  + ("⛔" + ";".join(r['gates']) if r['gates'] else "✅门控通过"))
     elif cmd == "options":
         from lab.options import assess_options
         cfg = _cfg()

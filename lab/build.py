@@ -100,6 +100,19 @@ def build(config=None, source=None, period="5y", verbose=True):
         extras["clusters"] = _clusters(barsmap)
     except Exception:
         pass
+    try:  # earnings radar (free yfinance, next 3 weeks)
+        from .earnings import get_earnings
+        extras["earnings"] = get_earnings(tickers)
+        if verbose: print(f"[earnings] {len(extras['earnings'])} upcoming in 3 weeks")
+    except Exception as e:
+        if verbose: print("[earnings] skipped:", e)
+    if cfg.get("top10", False):  # daily Top-10 options (real chain quotes; slower — opt-in)
+        try:
+            from .options import top_contracts
+            extras["top10"] = top_contracts(tickers, lambda t: barsmap.get(t), cfg.get("capital", 10000))
+            if verbose: print(f"[top10] {len(extras['top10'])} contracts ranked")
+        except Exception as e:
+            if verbose: print("[top10] skipped:", e)
     try:  # FINRA dark-pool SVR radar (free)
         from .darkpool import dark_svr
         dp = dark_svr(tickers)

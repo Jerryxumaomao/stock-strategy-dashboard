@@ -47,6 +47,31 @@ def _mid(row):
     lp = float(row.get("lastPrice") or 0)
     return (lp, None) if lp > 0 else (None, None)
 
+def top_contracts(watchlist, get_bars, capital=10000, max_tickers=12, top=10):
+    """Daily Top-10 buy-worthy options across the whole pool — ranked by de-trended
+    empirical EV using REAL chain quotes, and shown even if everything is expensive
+    (a 'least bad' ranking beats no ranking; the gates still apply before any trade)."""
+    cands = []
+    for t in watchlist[:max_tickers]:
+        try:
+            bars = get_bars(t)
+            if not bars or len(bars) < 300:
+                continue
+            a = assess_options(t, bars, capital)
+            for b in a.get("buckets", []):
+                if b.get("EV_pct") is None:
+                    continue
+                cands.append({"t": t, "bucket": b["bucket"], "expiry": b["expiry"],
+                              "dte": b["dte"], "K": b["strike"], "mid": b["mid"],
+                              "spread_pct": b.get("spread_pct"), "EV_pct": b["EV_pct"],
+                              "P_win": b["P_win"], "gates": b.get("gates", []),
+                              "lottery_admitted": b.get("lottery_admitted")})
+        except Exception:
+            continue
+    cands.sort(key=lambda x: -x["EV_pct"])
+    return cands[:top]
+
+
 def assess_options(ticker, bars, capital=10000):
     """Vol cone + bucket-by-bucket contract candidates via yfinance chains."""
     C = [b["c"] for b in bars]

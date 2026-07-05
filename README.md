@@ -100,6 +100,11 @@ Every `build` automatically:
 Run `python run.py review` for a lightweight intraday refresh (snapshot + score + proposals,
 no rebuild). The more often you run it, the more precise that day's hi/lo record becomes.
 
+Also in every build: an **earnings radar** (next 3 weeks, with the straddle-window guidance)
+and — with `"top10": true` in config — a **daily Top-10 options ranking** across the pool
+(real chain quotes, de-trended EV, shown even when everything is expensive; gates attached).
+Standalone: `python run.py top10`.
+
 Built-in proposal gates: buy zones posted too deep (price ran away untouched) · zones/stops too
 tight (filled then stopped) · strategy discrimination broken (active picks underperform the avoid
 bucket → re-diagnose the universe).
