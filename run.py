@@ -13,6 +13,7 @@ CLI for stock-strategy-dashboard.
   python run.py movers               market-wide movers radar: gainers/losers/actives + options UOA
   python run.py darkpool             FINRA dark-pool SVR radar for your watchlist (free, daily)
   python run.py darkprints           today's dark-pool block prints via local TWS API (optional)
+  python run.py extended             pre/after-hours & overnight quotes via local TWS API (optional)
 
 Data source defaults to Yahoo Finance (free). Change "source" in config.json.
 """
@@ -120,6 +121,9 @@ def main():
     elif cmd == "darkprints":
         import subprocess as sp
         sp.run([sys.executable, os.path.join(ROOT, "lab", "darkprints.py")])
+    elif cmd == "extended":
+        import subprocess as sp
+        sp.run([sys.executable, os.path.join(ROOT, "lab", "extended.py")])
     elif cmd == "movers":
         from lab.movers import get_movers
         m = get_movers()

@@ -78,6 +78,24 @@ def diagnose(ticker, bars, name=None, pool_E=None):
     rec = {"ticker": ticker, "name": name or ticker, "last": round(last, 2), "chg": chg,
            "stage": stage, "vol": vol, "pct_from_high": pct_from_high, "bars": n,
            "state": market_state(bars)}
+    # overnight-gap behavior (pre-market playbook): does THIS ticker's >=2% gap-up
+    # historically continue (gap-and-go) or fade? Rendered as situational advice
+    # ("don't chase / ok to chase + why") whenever the ticker is up/down >=2%.
+    import statistics as _sts
+    O = [b.get("o", b["c"]) for b in bars]
+    ups = []; dns = []
+    for k in range(1, n):
+        pc, o = C[k - 1], O[k]
+        if pc <= 0 or o <= 0:
+            continue
+        g = o / pc - 1
+        if g >= 0.02: ups.append(C[k] / o - 1)
+        elif g <= -0.02: dns.append(C[k] / o - 1)
+    rec["gap"] = {
+        "cont": round(sum(1 for x in ups if x > 0) / len(ups) * 100) if len(ups) >= 20 else None,
+        "oc_up": round(_sts.mean(ups) * 100, 1) if len(ups) >= 20 else None, "n_up": len(ups),
+        "bounce": round(sum(1 for x in dns if x > 0) / len(dns) * 100) if len(dns) >= 20 else None,
+    }
 
     if n < 250:
         rec.update({"strategy": "avoid", "bucket": "历史不足·新标的",

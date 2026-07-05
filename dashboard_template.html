@@ -42,7 +42,10 @@ const PAYLOAD=/*__DATA__*/{};
 const SLAB={brk:['📈 宜突破','c-brk'],brk_atr:['📈 突破·宽止损','c-brk'],hold:['🏔️ 长持','c-hold'],dip:['📉 宜抄底','c-dip'],dip_re:['📉 抄底+再进','c-dip'],avoid:['🚫 回避','c-avoid']};
 const STL={para:['🔥抛物线','#faeceb','#c64545'],hot:['🔥过热','#faeceb','#c64545'],brk:['⚠️破位','#f8f1df','#b07d0a'],tight:['🛡️紧平台','#e9f5ee','#217a44'],quiet:['😴安静','#efe9de','#6c6a64'],neutral:['·常态','#efe9de','#6c6a64']};
 function stChip(r){var s=r.state;if(!s||!STL[s.st])return '';var x=STL[s.st];return ' <span class="chip" style="background:'+x[1]+';color:'+x[2]+'">'+x[0]+'</span>'}
-function stAdv(r){var s=r.state;if(!s)return '';var t={para:'🔥抛物线(20日+'+s.ret20+'%、超50MA '+s.ext+'%):10日暴涨/暴跌概率均×2.3——持有者减仓+收紧止损、勿加仓;买入计划暂停',hot:'🔥短期过热(5日+'+s.ret5+'%):10日暴跌概率×2.2——别追高,等回踩;持有者可先兑现一部分',brk:'⚠️破位(50MA下、20日'+s.ret20+'%):跌势延续概率×1.38——买入暂停、不接飞刀;持有者反抽即减',tight:'🛡️紧平台近高(20日区间'+s.rng20+'%):10日暴跌概率≈0——埋伏安全,分批建仓等突破',quiet:'😴低波动安静:大概率延续,按计划执行'}[s.st]||'';return t?'<div style="margin-top:6px;font-size:11px;color:#3d3d3a;border-top:1px dashed #e6dfd8;padding-top:5px">'+t+'</div>':''}
+function stAdv(r){var s=r.state;var t=s?({para:'🔥抛物线(20日+'+s.ret20+'%、超50MA '+s.ext+'%):10日暴涨/暴跌概率均×2.3——持有者减仓+收紧止损、勿加仓;买入计划暂停',hot:'🔥短期过热(5日+'+s.ret5+'%):10日暴跌概率×2.2——别追高,等回踩;持有者可先兑现一部分',brk:'⚠️破位(50MA下、20日'+s.ret20+'%):跌势延续概率×1.38——买入暂停、不接飞刀;持有者反抽即减',tight:'🛡️紧平台近高(20日区间'+s.rng20+'%):10日暴跌概率≈0——埋伏安全,分批建仓等突破',quiet:'😴低波动安静:大概率延续,按计划执行'}[s.st]||''):'';
+ var g=r.gap;
+ if(g&&g.cont!=null&&Math.abs(r.chg)>=2){var gt=r.chg>=2?(g.cont<=45?'🔴 今日大涨+'+r.chg+'%别追:该票≥2%跳空延续率仅'+g.cont+'%(n='+g.n_up+')、追入开→收均值'+g.oc_up+'%,fade票的高开=减仓窗口':g.cont>=55?'🟢 今日+'+r.chg+'%可顺势:跳空延续率'+g.cont+'%(n='+g.n_up+'),止损设开盘价下方':'🟡 今日+'+r.chg+'%:跳空无明显倾向('+g.cont+'%),按原计划'):(g.bounce!=null&&g.bounce>=55?'🟢 今日'+r.chg+'%:历史下跳反弹率'+g.bounce+'%,企稳后可按买入区接':'🔴 今日'+r.chg+'%:下跳反弹率'+(g.bounce==null?'样本不足':g.bounce+'%')+',不接飞刀');t=(t?t+'<br>':'')+gt;}
+ return t?'<div style="margin-top:6px;font-size:11px;color:#3d3d3a;border-top:1px dashed #e6dfd8;padding-top:5px">'+t+'</div>':''}
 const $=id=>document.getElementById(id);
 $('ttl').textContent=PAYLOAD.title||'Stock Strategy Dashboard';
 $('sub').textContent='更新 '+PAYLOAD.as_of+' · 数据源 '+PAYLOAD.source+' · '+PAYLOAD.tickers.length+' 只 · 决策辅助非投资建议';

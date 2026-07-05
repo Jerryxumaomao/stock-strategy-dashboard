@@ -62,6 +62,20 @@ From a 39k sample-day study (46 tickers × 5y, 10-day forward window; baseline: 
 Key insight: **price signals predict the volatility state, not the direction.** Caveats: no volume data,
 overlapping samples, mostly one bull regime, survivor-biased ticker pool — crash lifts will be worse in a bear.
 
+## Situational gap advice (盘前/大涨喊话)
+Each diagnosis includes the ticker's own 15y overnight-gap behavior (continuation vs fade). Whenever a
+ticker is up/down ≥2%, its card speaks directly: **"don't chase — this name's gap continuation is only
+40%, chasing averaged -0.6%"** or **"ok to go with it — 60% continuation, stop below the open"**. No
+lookup tables; the advice appears exactly when the situation does.
+
+## Optimal-stopping exit for options (secretary rule)
+For positions with a HARD deadline (options), a fixed-horizon backtest (1,062 samples, 25-day windows)
+found two exits that beat the SMA50 trail: **z-target** (take profit when the move hits 2.33σ√t, ≈99th
+percentile — +0.31R) and the **37% secretary rule** (observe the first 37% of remaining life recording
+the peak; sell on the first new high after — +0.29R, 44% win vs trail's +0.22R/31%). Open-ended stock
+positions keep the SMA50 trail (it wins +1.01R when winners can run for months). Match the exit rule
+to the position's time structure.
+
 ## Strategies
 | Strategy | For | Entry | Exit | Stop |
 |---|---|---|---|---|
