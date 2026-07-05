@@ -28,8 +28,12 @@ def move_dist(C, T):
     return [(C[i + T] / C[i] - 1) * 100 for i in range(len(C) - T)]
 
 def score_call(S, K, P, ups):
+    """Empirical EV. De-trended: subtract the historical mean drift so a 10x bull-run
+    history doesn't inflate call EV (survivorship/trend bias) — keeps only the vol structure."""
     if not ups or P <= 0:
         return None
+    mu = statistics.mean(ups)
+    ups = [r - mu for r in ups]
     payoffs = [max(0.0, S * (1 + r / 100) - K) for r in ups]
     ev = statistics.mean(payoffs) - P
     pwin = sum(1 for r in ups if S * (1 + r / 100) - K > P) / len(ups) * 100

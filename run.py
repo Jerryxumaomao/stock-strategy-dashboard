@@ -11,6 +11,8 @@ CLI for stock-strategy-dashboard.
   python run.py options NVDA MU      options: vol cone + implied-vs-realized + 4-bucket candidates
   python run.py audit                score real trades (history/trades.json) vs frozen recs
   python run.py movers               market-wide movers radar: gainers/losers/actives + options UOA
+  python run.py darkpool             FINRA dark-pool SVR radar for your watchlist (free, daily)
+  python run.py darkprints           today's dark-pool block prints via local TWS API (optional)
 
 Data source defaults to Yahoo Finance (free). Change "source" in config.json.
 """
@@ -109,6 +111,15 @@ def main():
         rep = audit_trades(json.load(open(fp, encoding="utf-8")), hist, cfg.get("capital", 10000))
         print(f"纪律分 {rep['discipline_score']}/100 · scored {rep['n_scored']} · drift ${rep['drift_cost']}")
         for r in rep["rows"]: print(" ", r["date"], r["verdict"], r["sym"], r["side"], r["px"], r["why"], f"(pnl {r['pnl']})")
+    elif cmd == "darkpool":
+        from lab.darkpool import dark_svr
+        dp = dark_svr(_cfg().get("watchlist", []))
+        if not dp: print("no FINRA data"); return
+        print("dark-pool SVR", dp["as_of"], "(z>=|1.5| = anomaly; high SVR ~= buying pressure)")
+        for r in dp["rows"][:15]: print(f"  {r['t']:6} SVR {r['svr']}% (avg {r['avg10']}%) z={r['z']}")
+    elif cmd == "darkprints":
+        import subprocess as sp
+        sp.run([sys.executable, os.path.join(ROOT, "lab", "darkprints.py")])
     elif cmd == "movers":
         from lab.movers import get_movers
         m = get_movers()

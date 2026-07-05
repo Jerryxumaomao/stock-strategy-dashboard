@@ -43,17 +43,29 @@ def market_state(bars):
         rets = [C[m] / C[m - 1] - 1 for m in range(k - 19, k + 1)]
         vols.append(_st.pstdev(rets))
     v = vols[-1]; volp = sum(1 for x in vols if x <= v) / len(vols)
-    if ret20 > 0.40 and C[i] > s50 * 1.25: st = "para"
-    elif C[i] < s50 and ret20 < -0.15: st = "brk"
-    elif ret5 > 0.15: st = "hot"
-    elif rng20 < 0.12 and C[i] >= hi252 * 0.85: st = "tight"
+    # vol-normalized thresholds (z-scores vs the ticker's own volatility): a 40% month is
+    # normal for a 150%-vol name but parabolic for a 40%-vol name. Fixes false alarms.
+    import math as _m
+    sig = vols[-1] if vols else 0  # daily sigma (fraction)
+    z20 = ret20 / (sig * _m.sqrt(20)) if sig else 0
+    z5 = ret5 / (sig * _m.sqrt(5)) if sig else 0
+    med_rng = None
+    try:
+        rngs = [(max(H[k-19:k+1]) - min(L[k-19:k+1])) / C[k] for k in range(i - 251, i + 1)]
+        med_rng = _st.median(rngs)
+    except Exception:
+        pass
+    if z20 > 2.5 and C[i] > s50 * (1 + 2 * sig * _m.sqrt(50)): st = "para"
+    elif C[i] < s50 and z20 < -1.2: st = "brk"
+    elif z5 > 2.2: st = "hot"
+    elif med_rng and rng20 < 0.6 * med_rng and C[i] >= hi252 * 0.85: st = "tight"
     elif volp < 0.20: st = "quiet"
     else: st = "neutral"
     return {"st": st, "ret20": round(ret20 * 100), "ret5": round(ret5 * 100),
             "ext": round(ext * 100), "rng20": round(rng20 * 100), "volp": round(volp * 100)}
 
 
-def diagnose(ticker, bars, name=None):
+def diagnose(ticker, bars, name=None, pool_E=None):
     n = len(bars)
     C = [b["c"] for b in bars]; H = [b["h"] for b in bars]; L = [b["l"] for b in bars]
     last = C[-1]
@@ -77,11 +89,18 @@ def diagnose(ticker, bars, name=None):
     bk = agg(brk_trades(bars)); ba = agg(brk_atr_trades(bars))
     rec["backtest"] = {"dip": d, "dip_re": dr, "brk": bk, "brk_atr": ba}
 
-    # pick the strategy with the highest positive expectancy & enough signals
-    best, bexp = "avoid", 0.10
+    # pick the best strategy. With pool_E (from build): empirical-Bayes shrinkage —
+    # shrink each small per-ticker sample toward the pooled prior (K=10) so one lucky
+    # trade can't flip a classification. Without pool: raw expectancy (single-ticker mode).
+    K = 10
+    best, bexp = "avoid", (0.15 if pool_E else 0.10)
     for key, res in (("dip", d), ("dip_re", dr), ("brk", bk), ("brk_atr", ba)):
-        if res["n"] >= 5 and res["expectancy_R"] > bexp:
-            best, bexp = key, res["expectancy_R"]
+        if res["n"] >= 5:
+            e = res["expectancy_R"]
+            if pool_E is not None:
+                e = (res["n"] * e + K * pool_E.get(key, 0)) / (res["n"] + K)
+            if e > bexp:
+                best, bexp = key, e
     rec["strategy"] = best
 
     # 若主动策略都不占优,但它是强趋势长牛,则改判"长持"(正股·不加杠杆)

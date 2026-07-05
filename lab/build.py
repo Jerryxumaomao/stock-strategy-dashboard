@@ -1,9 +1,12 @@
 """
-Orchestrator: read config -> fetch history (data source) -> diagnose every ticker ->
-render a self-contained dashboard.html (data embedded, opens with file://).
+Orchestrator: fetch -> pool stats (shrinkage prior) -> diagnose every ticker ->
+market gate (SPY 200MA) + correlation clusters + dark-pool SVR -> render dashboard ->
+freeze + snapshot + review loop.
 """
 import json
+import math
 import os
+import statistics
 import time
 
 from .datasource import get_history
@@ -18,26 +21,93 @@ def load_config(path=None):
         return json.load(f)
 
 
+STRAT_LABEL = {"dip": "📉宜抄底", "dip_re": "📉抄底+再进", "brk": "📈宜突破",
+               "brk_atr": "📈突破·宽止损", "hold": "🏔️长持", "avoid": "🚫回避"}
+
+
+def _pool_expectancy(barsmap):
+    """Pooled per-strategy expectancy — the empirical-Bayes prior for shrinkage.
+    Per-ticker samples are small (5-30 trades); shrinking toward the pool mean stops
+    a single lucky trade from flipping a ticker's strategy assignment."""
+    from .backtest import dip_trades, brk_trades, brk_atr_trades
+    pool = {"dip": [], "dip_re": [], "brk": [], "brk_atr": []}
+    for t, b in barsmap.items():
+        if len(b) < 250:
+            continue
+        pool["dip"] += dip_trades(b); pool["dip_re"] += dip_trades(b, True)
+        pool["brk"] += brk_trades(b); pool["brk_atr"] += brk_atr_trades(b)
+    return {k: (statistics.mean([x["R"] for x in v]) if v else 0) for k, v in pool.items()}
+
+
+def _clusters(barsmap, thr=0.7, win=120):
+    rets = {t: [b[i]["c"] / b[i-1]["c"] - 1 for i in range(len(b) - win, len(b))]
+            for t, b in barsmap.items() if len(b) >= win + 1}
+    ts = sorted(rets); parent = {t: t for t in ts}
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]; x = parent[x]
+        return x
+    def corr(a, b):
+        ma, mb = statistics.mean(a), statistics.mean(b)
+        num = sum((x - ma) * (y - mb) for x, y in zip(a, b))
+        da = math.sqrt(sum((x - ma) ** 2 for x in a)); db = math.sqrt(sum((y - mb) ** 2 for y in b))
+        return num / (da * db) if da and db else 0
+    for i in range(len(ts)):
+        for j in range(i + 1, len(ts)):
+            if corr(rets[ts[i]], rets[ts[j]]) > thr:
+                parent[find(ts[i])] = find(ts[j])
+    groups = {}
+    for t in ts:
+        groups.setdefault(find(t), []).append(t)
+    return sorted([v for v in groups.values() if len(v) >= 2], key=len, reverse=True)
+
+
 def build(config=None, source=None, period="5y", verbose=True):
     cfg = config or load_config()
     source = source or cfg.get("source", "yahoo")
     tickers = cfg.get("watchlist", [])
-    results = []
+    barsmap = {}
     for t in tickers:
         try:
-            bars = get_history(t, source=source, period=period)
-            if not bars:
-                if verbose: print(f"  {t}: no data, skipped")
-                continue
-            rec = diagnose(t, bars)
-            results.append(rec)
-            if verbose:
-                print(f"  {t}: {rec['strategy']:8} {rec.get('bucket','')}  ({rec['stage']}, vol {rec['vol']}%)")
+            b = get_history(t, source=source, period=period)
+            if b:
+                barsmap[t] = b
+            elif verbose:
+                print(f"  {t}: no data, skipped")
         except Exception as e:
             if verbose: print(f"  {t}: ERROR {e}")
-        time.sleep(0.2)  # be polite to the data source
-    render(results, cfg)
-    # 复盘闭环:冻结今日推荐(幂等,每天一次)+ 合并行情快照 + 打分 + 检查提案门槛
+        time.sleep(0.2)
+    pool_E = _pool_expectancy(barsmap)
+    if verbose:
+        print("[pool] strategy priors:", {k: round(v, 2) for k, v in pool_E.items()})
+    results = []
+    for t, b in barsmap.items():
+        rec = diagnose(t, b, pool_E=pool_E)
+        results.append(rec)
+        if verbose:
+            print(f"  {t}: {rec['strategy']:8} {rec.get('bucket','')}  ({rec['stage']}, vol {rec['vol']}%)")
+    extras = {}
+    try:  # SPY 200MA market gate (Faber): below the line -> no breakout chasing, half size
+        sb = get_history("SPY", source=source, period=period)
+        SC = [x["c"] for x in sb]
+        if len(SC) >= 200:
+            s200 = sum(SC[-200:]) / 200
+            extras["market"] = {"spy": round(SC[-1], 2), "sma200": round(s200, 2),
+                                "above": SC[-1] > s200, "pct": round((SC[-1] / s200 - 1) * 100, 1)}
+    except Exception as e:
+        if verbose: print("[market] skipped:", e)
+    try:  # correlation clusters: same cluster ~= same bet, cap 1-2 positions per cluster
+        extras["clusters"] = _clusters(barsmap)
+    except Exception:
+        pass
+    try:  # FINRA dark-pool SVR radar (free)
+        from .darkpool import dark_svr
+        dp = dark_svr(tickers)
+        if dp: extras["dark"] = {"as_of": dp["as_of"], "rows": dp["rows"][:15]}
+        if verbose: print("[dark] FINRA SVR scanned" if dp else "[dark] no data")
+    except Exception as e:
+        if verbose: print("[dark] skipped:", e)
+    render(results, cfg, extras)
     try:
         from .review import freeze, run_review
         print("[freeze]", freeze(results, ROOT))
@@ -47,11 +117,7 @@ def build(config=None, source=None, period="5y", verbose=True):
     return results
 
 
-STRAT_LABEL = {"dip": "📉宜抄底", "dip_re": "📉抄底+再进", "brk": "📈宜突破",
-               "brk_atr": "📈突破·宽止损", "hold": "🏔️长持", "avoid": "🚫回避"}
-
-
-def render(results, cfg):
+def render(results, cfg, extras=None):
     tmpl_path = os.path.join(ROOT, "dashboard_template.html")
     with open(tmpl_path, encoding="utf-8") as f:
         tmpl = f.read()
@@ -61,6 +127,8 @@ def render(results, cfg):
                "capital": cfg.get("capital", 10000),
                "risk_pct": cfg.get("risk_pct", 1.5),
                "tickers": results}
+    if extras:
+        payload.update(extras)
     if cfg.get("movers", True):
         try:
             from .movers import get_movers
@@ -73,7 +141,6 @@ def render(results, cfg):
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"\n[ok] dashboard -> {out}  ({len(results)} tickers)")
-    # summary
     from collections import Counter
     c = Counter(r["strategy"] for r in results)
-    print("[strategy] " + " · ".join(f"{STRAT_LABEL.get(k,k)}:{v}" for k, v in c.items()))
+    print("[strategy] " + " · ".join(f"{STRAT_LABEL.get(k, k)}:{v}" for k, v in c.items()))
