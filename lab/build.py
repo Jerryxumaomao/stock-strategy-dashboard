@@ -149,10 +149,20 @@ def render(results, cfg, extras=None):
             print("[movers] market radar scanned")
         except Exception as e:
             print("[movers] skipped:", e)
-    html = tmpl.replace("/*__DATA__*/", json.dumps(payload, ensure_ascii=False))
+    # Replace the WHOLE marker including its {} placeholder — swapping only the comment
+    # leaves `{json}{}` behind, a SyntaxError that renders the dashboard blank.
+    html = tmpl.replace("/*__DATA__*/{}", json.dumps(payload, ensure_ascii=False))
+    if "/*__DATA__*/" in html:
+        raise RuntimeError("payload marker not replaced — template must contain /*__DATA__*/{}")
     out = os.path.join(ROOT, "dashboard.html")
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
+    hist = os.path.join(ROOT, "history")
+    os.makedirs(hist, exist_ok=True)
+    with open(os.path.join(hist, "build.log"), "a", encoding="utf-8") as lf:
+        # On-disk verification record: "when did the last good build happen" must be
+        # answerable from this file, not from anyone's conversation memory.
+        lf.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} | ok | {len(results)} tickers\n")
     print(f"\n[ok] dashboard -> {out}  ({len(results)} tickers)")
     from collections import Counter
     c = Counter(r["strategy"] for r in results)

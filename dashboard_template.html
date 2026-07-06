@@ -42,6 +42,21 @@ const PAYLOAD=/*__DATA__*/{};
 const SLAB={brk:['📈 宜突破','c-brk'],brk_atr:['📈 突破·宽止损','c-brk'],hold:['🏔️ 长持','c-hold'],dip:['📉 宜抄底','c-dip'],dip_re:['📉 抄底+再进','c-dip'],avoid:['🚫 回避','c-avoid']};
 const STL={para:['🔥抛物线','#faeceb','#c64545'],hot:['🔥过热','#faeceb','#c64545'],brk:['⚠️破位','#f8f1df','#b07d0a'],tight:['🛡️紧平台','#e9f5ee','#217a44'],quiet:['😴安静','#efe9de','#6c6a64'],neutral:['·常态','#efe9de','#6c6a64']};
 function stChip(r){var s=r.state;if(!s||!STL[s.st])return '';var x=STL[s.st];return ' <span class="chip" style="background:'+x[1]+';color:'+x[2]+'">'+x[0]+'</span>'}
+function distChip(r){var s=r.signal||{};
+ // Breakout FIRST: pre-trigger the price sits below the ATR stop by design (you haven't
+ // entered yet), so the stop-breach test must NOT run here — it only applies to a dip
+ // whose support has failed. Ordering these wrong flags every un-triggered breakout as broken.
+ if(s.type==='breakout'&&s.trigger){var d=(s.trigger-r.last)/r.last*100;
+  if(d<=0)return ' <span class="chip" style="background:#e9f5ee;color:#217a44;font-weight:800">🚀已过触发价</span>';
+  if(d<=3)return ' <span class="chip" style="background:#e9f5ee;color:#217a44">🟢距触发+'+d.toFixed(1)+'%</span>';
+  return ' <span class="chip" style="background:#efe9de;color:#6c6a64">距触发+'+d.toFixed(1)+'%·勿追</span>';}
+ var z=s.buy_zones&&s.buy_zones[0];if(!z)return '';
+ var st=s.stop||s.trend_stop;
+ if(st&&r.last<=st)return ' <span class="chip" style="background:#faeceb;color:#c64545">⛔破位·信号失效</span>';
+ var d2=(r.last-z)/z*100;
+ if(d2<=1)return ' <span class="chip" style="background:#e9f5ee;color:#217a44;font-weight:800">🎯已到买点</span>';
+ if(d2<=6)return ' <span class="chip" style="background:#e9f5ee;color:#217a44">🟢近买点+'+d2.toFixed(1)+'%</span>';
+ return ' <span class="chip" style="background:#efe9de;color:#6c6a64">离买点+'+d2.toFixed(1)+'%</span>';}
 function stAdv(r){var s=r.state;var t=s?({para:'🔥抛物线(20日+'+s.ret20+'%、超50MA '+s.ext+'%):10日暴涨/暴跌概率均×2.3——持有者减仓+收紧止损、勿加仓;买入计划暂停',hot:'🔥短期过热(5日+'+s.ret5+'%):10日暴跌概率×2.2——别追高,等回踩;持有者可先兑现一部分',brk:'⚠️破位(50MA下、20日'+s.ret20+'%):跌势延续概率×1.38——买入暂停、不接飞刀;持有者反抽即减',tight:'🛡️紧平台近高(20日区间'+s.rng20+'%):10日暴跌概率≈0——埋伏安全,分批建仓等突破',quiet:'😴低波动安静:大概率延续,按计划执行'}[s.st]||''):'';
  var g=r.gap;
  if(g&&g.cont!=null&&Math.abs(r.chg)>=2){var gt=r.chg>=2?(g.cont<=45?'🔴 今日大涨+'+r.chg+'%别追:该票≥2%跳空延续率仅'+g.cont+'%(n='+g.n_up+')、追入开→收均值'+g.oc_up+'%,fade票的高开=减仓窗口':g.cont>=55?'🟢 今日+'+r.chg+'%可顺势:跳空延续率'+g.cont+'%(n='+g.n_up+'),止损设开盘价下方':'🟡 今日+'+r.chg+'%:跳空无明显倾向('+g.cont+'%),按原计划'):(g.bounce!=null&&g.bounce>=55?'🟢 今日'+r.chg+'%:历史下跳反弹率'+g.bounce+'%,企稳后可按买入区接':'🔴 今日'+r.chg+'%:下跳反弹率'+(g.bounce==null?'样本不足':g.bounce+'%')+',不接飞刀');t=(t?t+'<br>':'')+gt;}
@@ -57,7 +72,7 @@ function sigHtml(r){var s=r.signal;if(!s||!s.type)return '';
  if(s.type==='hold')return '<div class="sig"><div class="t" style="color:#2f7d6b">🏔️ 长持·买便宜(正股·不加杠杆)</div>回踩买入 '+s.buy_zones.map(money).join(' / ')+'<br>目标 '+s.target.map(money).join(' / ')+' · 破 '+money(s.trend_stop)+'(200日线)离场'+posSize(s.buy_zones[0],s.trend_stop)+'</div>';
  return '<div class="sig"><div class="t" style="color:var(--primary)">📉 分批买入区</div>'+s.buy_zones.map(money).join(' / ')+' · 止损 '+money(s.stop)+'<br><span style="color:var(--dim)">'+(s.note||'')+'</span>'+posSize(s.buy_zones[0],s.stop)+'</div>';}
 function card(r){var sl=SLAB[r.strategy]||SLAB.avoid;var cc=r.chg>=0?'up':'down';
- return '<div class="card" data-sym="'+r.ticker+'"><div class="top"><div><div class="sym">'+r.ticker+'</div><div class="nm">'+r.stage+' · 波动'+r.vol+'%</div><div><span class="chip '+sl[1]+'">'+sl[0]+'</span>'+stChip(r)+'</div></div>'+
+ return '<div class="card" data-sym="'+r.ticker+'"><div class="top"><div><div class="sym">'+r.ticker+'</div><div class="nm">'+r.stage+' · 波动'+r.vol+'%</div><div><span class="chip '+sl[1]+'">'+sl[0]+'</span>'+stChip(r)+distChip(r)+'</div></div>'+
  '<div><div class="p">'+money(r.last)+'</div><div class="'+cc+'" style="font-size:12px;font-weight:600;text-align:right">'+(r.chg>=0?'▲':'▼')+' '+r.chg+'%</div></div></div>'+
  '<div class="rows"><div class="row"><span class="k">距52周高</span><span class="down">'+r.pct_from_high+'%</span></div>'+(r.bucket?'<div class="row"><span class="k">类别</span><span>'+r.bucket+'</span></div>':'')+'</div>'+
  sigHtml(r)+stAdv(r)+(bt(r)?'<div class="bt">'+bt(r)+'</div>':'')+(r.action?'<div class="act">'+r.action+'</div>':'')+'</div>';}
@@ -118,5 +133,16 @@ $('body').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="sec">'+secName[s
 (function(){var D=PAYLOAD.dark;if(!D||!D.rows||!D.rows.length)return;
  var tr=D.rows.map(r=>'<tr'+(Math.abs(r.z)>=1.5?' style="background:#f9ede8"':'')+'><td><b>'+r.t+'</b></td><td>'+r.svr+'%</td><td>'+r.avg10+'%</td><td class="'+(r.z>0?'up':'down')+'" style="font-weight:700">'+r.z+'</td><td>'+(r.z>=1.5?'🟢买压跳升':r.z<=-1.5?'🔴买压萎缩':'·')+'</td></tr>').join('');
  document.getElementById('body').insertAdjacentHTML('beforeend','<div class="sec" style="margin-top:20px">🌑 暗盘雷达(FINRA官方免费 · '+D.as_of+')</div><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:#6c6a64"><th>票</th><th>SVR</th><th>10日均</th><th>z分</th><th>解读</th></tr></thead><tbody>'+tr+'</tbody></table><div style="font-size:11px;color:#6c6a64;margin-top:6px">DIX逻辑(反直觉):高SVR≈做市商做空填买单=买压;看z分跳变非绝对值。T+1晚间更新,仅统计无逐笔。</div>');})();
+/* real-time US market session label (ET), self-refreshing every 60s — a static
+   "closed" flag printed at build time goes stale the moment the market opens */
+(function(){function paint(){var e=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));var day=e.getDay(),m=e.getHours()*60+e.getMinutes();var s,c;
+ if(day===0||day===6){s='🌙 周末休市';c='#6c6a64'}
+ else if(m>=570&&m<960){s='🟢 盘中';c='#217a44'}
+ else if(m>=240&&m<570){s='🌅 盘前';c='#b07d0a'}
+ else if(m>=960&&m<1200){s='🌆 盘后';c='#b07d0a'}
+ else{s='🌙 已收盘';c='#6c6a64'}
+ var el=document.getElementById('mktst');if(!el){el=document.createElement('span');el.id='mktst';$('sub').appendChild(el)}
+ el.innerHTML=' · <b style="color:'+c+'">'+s+'</b>(美东实时)';}
+ try{paint();setInterval(paint,60000)}catch(e){}})();
 $('foot').innerHTML='<b>方法:</b> 每只票诊断趋势阶段/波动率,回测"回踩抄底"与"突破追涨"两策略,分配历史正期望者(否则回避并给类别对策);出场跟随SMA50让赢家跑。<br><b>诚实:</b> 规则代理非严格缠论,样本内、历史不代表未来,价值在验证期望与纪律。非投资建议。';
 </script></body></html>

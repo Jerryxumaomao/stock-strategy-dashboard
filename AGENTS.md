@@ -133,3 +133,5 @@ User exports fills to `history/trades.json` (format in `lab/audit.py` docstring)
 | Emoji above 13.0 (🪞 etc.) | Renders as tofu boxes on Win10. Stick to Emoji ≤12.0 in any HTML output |
 | Rendering nullable fields | `'+v.x+'%'` prints "null%" when x is null. Guard every nullable: `(v.x==null?'—':v.x+'%')` |
 | Idempotent injectors | Judge success by "pattern EXISTS", not "content changed" — re-running with already-fresh values must not report failure |
+| Template payload marker `/*__DATA__*/{}` | Replace the WHOLE marker including its `{}` placeholder. Swapping only the comment leaves `{json}{}` behind = SyntaxError = silently blank dashboard (shipped broken once; build.py now raises if the marker survives) |
+| "Was it verified?" answered from memory | Conversation memory gets distorted by context compaction. Every good build appends a timestamped line to `history/build.log` — answer "when was the last good build" from that file, and syntax-check the generated dashboard (`node --check` on the extracted script) rather than trusting a success message |

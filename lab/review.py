@@ -40,7 +40,14 @@ def freeze(results, root, spy_last=None):
             "state": (r.get("state") or {}).get("st"),
             "signal": r.get("signal") or {},
         }
-    json.dump({"date": today, "recs": recs, "spy_last": spy_last}, open(fp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    json.dump({"date": today, "recs": recs, "spy_last": spy_last,
+               "frozen_at": datetime.datetime.now().isoformat(timespec="seconds"),
+               # Measurement honesty: record what forward scoring does NOT capture,
+               # so cohort scores are never mistaken for realized trading results.
+               "assumptions": {"fill": "scored vs later snapshot closes, not real fills",
+                               "costs": "no commissions/slippage included",
+                               "info_time": "signals frozen at build time (no look-ahead)"}},
+              open(fp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return f"froze {len(recs)} recs -> recs-{today}.json"
 
 
