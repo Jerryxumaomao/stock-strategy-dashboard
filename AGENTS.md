@@ -129,3 +129,7 @@ User exports fills to `history/trades.json` (format in `lab/audit.py` docstring)
 | `yf.screen` missing | Older yfinance — movers section degrades; suggest `pip install -U yfinance` |
 | Tiny backtest samples (n<5) | Strategy falls to avoid/hold checks; never present n=1-2 stats as meaningful |
 | New IPOs (<250 bars) | Diagnosed as insufficient-history; don't force strategies onto them |
+| JS `String.replace` with `$'`/`$&` in replacement | Corrupts the file (inserts the whole suffix). Use a function replacer `replace(x, () => str)` or split/join |
+| Emoji above 13.0 (🪞 etc.) | Renders as tofu boxes on Win10. Stick to Emoji ≤12.0 in any HTML output |
+| Rendering nullable fields | `'+v.x+'%'` prints "null%" when x is null. Guard every nullable: `(v.x==null?'—':v.x+'%')` |
+| Idempotent injectors | Judge success by "pattern EXISTS", not "content changed" — re-running with already-fresh values must not report failure |

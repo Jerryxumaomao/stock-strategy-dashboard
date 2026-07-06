@@ -123,7 +123,7 @@ def build(config=None, source=None, period="5y", verbose=True):
     render(results, cfg, extras)
     try:
         from .review import freeze, run_review
-        print("[freeze]", freeze(results, ROOT))
+        print("[freeze]", freeze(results, ROOT, spy_last=(extras.get("market") or {}).get("spy")))
         run_review(cfg, ROOT, do_snapshot=True)
     except Exception as e:
         print("[review] skipped:", e)

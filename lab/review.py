@@ -27,8 +27,8 @@ def _hist_dir(root):
     return d
 
 
-def freeze(results, root):
-    """Idempotent daily freeze of the diagnosed recommendations."""
+def freeze(results, root, spy_last=None):
+    """Idempotent daily freeze of the diagnosed recommendations (records SPY for alpha decomposition)."""
     today = datetime.date.today().isoformat()
     fp = os.path.join(_hist_dir(root), f"recs-{today}.json")
     if os.path.exists(fp):
@@ -40,7 +40,7 @@ def freeze(results, root):
             "state": (r.get("state") or {}).get("st"),
             "signal": r.get("signal") or {},
         }
-    json.dump({"date": today, "recs": recs}, open(fp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    json.dump({"date": today, "recs": recs, "spy_last": spy_last}, open(fp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return f"froze {len(recs)} recs -> recs-{today}.json"
 
 
@@ -50,6 +50,7 @@ def snapshot(tickers, source, root):
     running multiple times a day tightens that day's hi/lo instead of duplicating."""
     hist = _hist_dir(root)
     merged = 0
+    tickers = list(tickers) + ([] if 'SPY' in tickers else ['SPY'])  # SPY always snapshotted: alpha benchmark
     for t in tickers:
         try:
             bars = get_history(t, source=source, period="5d")
@@ -87,13 +88,22 @@ def score(root):
             for t, v in snap.items():
                 a = agg.setdefault(t, {"hi": -1e18, "lo": 1e18, "last": None})
                 a["hi"] = max(a["hi"], v["hi"]); a["lo"] = min(a["lo"], v["lo"]); a["last"] = v["last"]
-        recs = json.load(open(rf, encoding="utf-8"))["recs"]
+        frozen = json.load(open(rf, encoding="utf-8"))
+        recs = frozen["recs"]
+        # Alpha decomposition: score EXCESS return over SPY when both endpoints known,
+        # so a bull tide doesn't get booked as strategy skill.
+        spy_fwd = None
+        spy_a = agg.get('SPY'); spy_base = frozen.get('spy_last')
+        if spy_a and spy_a.get('last') and spy_base:
+            spy_fwd = (spy_a['last'] / spy_base - 1) * 100
         rows = []
         for t, r in recs.items():
             a = agg.get(t)
             if not a or not r.get("last"):
                 continue
             fwd = (a["last"] / r["last"] - 1) * 100
+            if spy_fwd is not None:
+                fwd -= spy_fwd
             sig = r.get("signal") or {}
             zones = sig.get("buy_zones") or []
             buy_hit = any(a["lo"] <= z for z in zones)
@@ -115,6 +125,8 @@ def score(root):
             "buy_zone_touch_rate": round(len(touched) / len(zoned) * 100, 1) if zoned else None,
             "stop_breach_after_touch": round(sum(1 for r in touched if r["stop_hit"]) / len(touched) * 100, 1) if touched else None,
             "breakout_fire_rate": round(sum(1 for r in rows if r["trig_fired"]) / max(1, sum(1 for r in rows if (r.get("strategy") or "").startswith("brk"))) * 100, 1),
+            "benchmark": ("SPY-excess" if spy_fwd is not None else "raw (no SPY baseline in this cohort)"),
+            "rows_compact": [{"t": r["t"], "s": r["strategy"], "fwd": r["fwd"]} for r in rows],
         }
     json.dump(report, open(os.path.join(hist, "review-report.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return report
@@ -132,6 +144,22 @@ def propose(report, root):
                           "suggested_change": change, "status": "pending_user_approval"})
 
     if mature:
+        import random
+        def _perm_p(rows, n_perm=2000):
+            """Permutation test: shuffle strategy labels; p-value of the observed
+            active-vs-avoid gap. Guards proposals against multiple-comparison noise."""
+            act = [r["fwd"] for r in rows if r.get("s") and r["s"] != "avoid"]
+            avd = [r["fwd"] for r in rows if r.get("s") == "avoid"]
+            if len(act) < 5 or len(avd) < 5:
+                return None
+            obs = statistics.mean(act) - statistics.mean(avd)
+            pool = act + avd; na = len(act); cnt = 0
+            rng = random.Random(42)
+            for _ in range(n_perm):
+                rng.shuffle(pool)
+                if statistics.mean(pool[:na]) - statistics.mean(pool[na:]) <= obs:
+                    cnt += 1
+            return cnt / n_perm
         def active_vs_avoid(v):
             fs = v["fwd_by_strategy"]
             act = [x for k, x in fs.items() if k != "avoid"]
@@ -139,7 +167,10 @@ def propose(report, root):
             if not av or av["n"] < 8 or not act:
                 return False
             act_avg = statistics.mean([x["avg"] for x in act])
-            return act_avg < av["avg"]
+            if act_avg >= av["avg"]:
+                return False
+            p = _perm_p(v.get("rows_compact") or [])
+            return p is not None and p < 0.10  # significant underperformance only — don't reward unlucky noise
         gate("buyzones_too_deep",
              {d: (v.get("buy_zone_touch_rate") is not None and v["buy_zone_touch_rate"] < 25) for d, v in mature.items()},
              "dip/hold buy zones almost never touched while prices ran (posted too deep)",
