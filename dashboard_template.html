@@ -141,7 +141,9 @@ function ashareBlock(r){var a=r.ashare;if(!a)return '';
  if(a.chan&&a.chan.mode==='chan'){var cm={buy1:['#217a44','一买'],buy2:['#217a44','二买'],buy3:['#217a44','三买'],neutral:['#6c6a64','中枢'],'break':['#b07d0a','破位'],sell:['#c64545','卖点']};var cc=cm[a.chan.cls]||['#6c6a64','·'];
    parts.push('缠论 <b style="color:'+cc[0]+'">'+cc[1]+'</b> <span style="color:#6c6a64">'+a.chan.state+'</span>'+(a.chan.signal?'<br><span style="color:'+cc[0]+';font-size:10.5px">↳ '+a.chan.signal+'</span>':''));}
  else if(a.chan&&a.chan.state)parts.push('<span style="color:#6c6a64">缠论: '+a.chan.state+'</span>');
- return '<div style="margin-top:8px;padding:7px 9px;background:rgba(204,120,92,.06);border-radius:8px;font-size:11px;line-height:1.7"><b style="color:var(--primary)">🇨🇳 A股因子</b><br>'+parts.join('<br>')+'</div>';
+ var f=a.friction;if(f&&(f.sealed_up_days||f.sealed_dn_days||f.brk_skipped_sealed_up||f.limit_trapped_exits))
+   parts.push('<span style="color:#b07d0a">⚠️涨跌停摩擦 封涨停'+f.sealed_up_days+'天/封跌停'+f.sealed_dn_days+'天'+(f.brk_skipped_sealed_up?'·买不进跳过'+f.brk_skipped_sealed_up+'次':'')+(f.limit_trapped_exits?'·跌停困住'+f.limit_trapped_exits+'次':'')+'</span>');
+ return '<div style="margin-top:8px;padding:7px 9px;background:rgba(204,120,92,.06);border-radius:8px;font-size:11px;line-height:1.7"><b style="color:var(--primary)">🇨🇳 A股因子</b><span style="color:#6c6a64;font-size:9.5px"> · 回测已含T+1+涨跌停</span><br>'+parts.join('<br>')+'</div>';
 }
 function card(r){var sl=SLAB[r.strategy]||SLAB.avoid;var cc=r.chg>=0?'up':'down';
  return '<div class="card" data-sym="'+r.ticker+'"><div class="top"><div><div class="sym">'+r.ticker+'</div><div class="nm">'+r.stage+' · 波动'+r.vol+'%</div><div><span class="chip '+sl[1]+'">'+sl[0]+'</span>'+stChip(r)+distChip(r)+'</div></div>'+

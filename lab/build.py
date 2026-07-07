@@ -25,11 +25,15 @@ STRAT_LABEL = {"dip": "📉宜抄底", "dip_re": "📉抄底+再进", "brk": "�
                "brk_atr": "📈突破·宽止损", "hold": "🏔️长持", "avoid": "🚫回避"}
 
 
-def _pool_expectancy(barsmap):
+def _pool_expectancy(barsmap, cn=False):
     """Pooled per-strategy expectancy — the empirical-Bayes prior for shrinkage.
     Per-ticker samples are small (5-30 trades); shrinking toward the pool mean stops
-    a single lucky trade from flipping a ticker's strategy assignment."""
-    from .backtest import dip_trades, brk_trades, brk_atr_trades
+    a single lucky trade from flipping a ticker's strategy assignment.
+    cn=True uses the A-share T+1+涨跌停 engine (0.10 default limit) so the prior matches."""
+    if cn:
+        from .backtest_cn import dip_trades, brk_trades, brk_atr_trades
+    else:
+        from .backtest import dip_trades, brk_trades, brk_atr_trades
     pool = {"dip": [], "dip_re": [], "brk": [], "brk_atr": []}
     for t, b in barsmap.items():
         if len(b) < 250:
@@ -77,23 +81,28 @@ def build(config=None, source=None, period="5y", verbose=True):
         except Exception as e:
             if verbose: print(f"  {t}: ERROR {e}")
         time.sleep(0.2)
-    pool_E = _pool_expectancy(barsmap)
-    if verbose:
-        print("[pool] strategy priors:", {k: round(v, 2) for k, v in pool_E.items()})
     is_ashare = (source == "akshare") or (cfg.get("market") == "ashare")
+    pool_E = _pool_expectancy(barsmap, cn=is_ashare)
+    if verbose:
+        print(f"[pool] strategy priors ({'A股T+1引擎' if is_ashare else '美股引擎'}):", {k: round(v, 2) for k, v in pool_E.items()})
     results = []
     for t, b in barsmap.items():
-        rec = diagnose(t, b, pool_E=pool_E)
-        if is_ashare:  # attach A-share-native factors (reversal/limit/turnover); see lab/ashare.py
+        cn_lim = None
+        if is_ashare:
+            from . import ashare as A
+            cn_lim = A.board_and_limit(t, "")["limit_pct"] / 100  # 板块涨跌停幅 -> T+1回测
+        rec = diagnose(t, b, pool_E=pool_E, cn_lim=cn_lim)
+        if is_ashare:  # attach A-share-native factors (reversal/limit/turnover/缠论/回测摩擦)
             try:
-                from . import ashare as A
                 from . import chanlun as CH
+                from . import backtest_cn as BC
                 rec["ashare"] = {
                     "board": A.board_and_limit(t, rec.get("name", "")),
                     "limit": A.limit_state(b, t, rec.get("name", "")),
                     "reversal": A.reversal_score(b),
                     "turnover": A.turnover_stats(b),
                     "chan": CH.analyze(b, rec.get("name", "")),   # 缠论(A股原生);见 lab/chanlun.py
+                    "friction": (BC.friction_report(b, cn_lim) if len(b) >= 250 else None),  # 涨跌停摩擦
                 }
             except Exception as e:
                 if verbose: print(f"  [ashare] {t} factor skip: {e}")

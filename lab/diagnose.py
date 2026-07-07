@@ -65,7 +65,9 @@ def market_state(bars):
             "ext": round(ext * 100), "rng20": round(rng20 * 100), "volp": round(volp * 100)}
 
 
-def diagnose(ticker, bars, name=None, pool_E=None):
+def diagnose(ticker, bars, name=None, pool_E=None, cn_lim=None):
+    # cn_lim set (A-share, e.g. 0.10/0.20) -> use T+1 + 涨跌停 aware engine (backtest_cn);
+    # None -> US engine (backtest). Same strategies, so expectancies are directly comparable.
     n = len(bars)
     C = [b["c"] for b in bars]; H = [b["h"] for b in bars]; L = [b["l"] for b in bars]
     last = C[-1]
@@ -103,8 +105,13 @@ def diagnose(ticker, bars, name=None, pool_E=None):
                     "backtest": {}})
         return rec
 
-    d = agg(dip_trades(bars)); dr = agg(dip_trades(bars, True))
-    bk = agg(brk_trades(bars)); ba = agg(brk_atr_trades(bars))
+    if cn_lim is not None:  # A股: T+1 + 涨跌停 引擎
+        from .backtest_cn import dip_trades as _dip, brk_trades as _brk, brk_atr_trades as _batr
+        d = agg(_dip(bars, lim=cn_lim)); dr = agg(_dip(bars, True, lim=cn_lim))
+        bk = agg(_brk(bars, lim=cn_lim)); ba = agg(_batr(bars, lim=cn_lim))
+    else:
+        d = agg(dip_trades(bars)); dr = agg(dip_trades(bars, True))
+        bk = agg(brk_trades(bars)); ba = agg(brk_atr_trades(bars))
     rec["backtest"] = {"dip": d, "dip_re": dr, "brk": bk, "brk_atr": ba}
 
     # pick the best strategy. With pool_E (from build): empirical-Bayes shrinkage —
