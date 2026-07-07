@@ -159,6 +159,54 @@ def main():
         if isinstance(lhb, list):
             for r in lhb[:15]: print("  ", r)
         else: print("  ", lhb)
+    elif cmd == "screen":  # A股选股筛选器: run.py screen [价格下限 上限] [涨跌下限 上限]
+        from lab.ashare_extras import screener
+        a = [float(x) for x in args] if args else []
+        kw = {}
+        if len(a) >= 2: kw["price"] = (a[0], a[1])
+        if len(a) >= 4: kw["chg"] = (a[2], a[3])
+        kw.setdefault("min_amount_yi", 5)
+        sc = screener(**kw)
+        if "error" in sc: print(sc["note"]); return
+        print(f"全A {sc['n_universe']} 只 → 命中 {sc['n_hit']} 只(按成交额):")
+        for r in sc["rows"]: print(f"  {r['code']} {r['name']:8} {r['px']:>8} {r['chg_pct']:>+6}%  成交{r['amount_yi']}亿")
+    elif cmd == "dossier":  # 个股档案: run.py dossier 600519
+        from lab.ashare_extras import stock_dossier
+        for c in (args or ["600519"]):
+            d = stock_dossier(c)
+            print(f"== {d['code']} 档案 ==")
+            if d.get("pe_ttm"): print(f"  PE(TTM) {d['pe_ttm']['now']} [近一年{d['pe_ttm']['pct_1y']}分位·{d['pe_ttm']['tag']}]")
+            if d.get("pb"): print(f"  PB {d['pb']['now']} [近一年{d['pb']['pct_1y']}分位·{d['pb']['tag']}]")
+            for k, v in (d.get("financials") or {}).items(): print(f"  {k}: {v}")
+    elif cmd == "rotation":  # 行业轮动
+        from lab.ashare_extras import industry_rotation
+        ir = industry_rotation()
+        if "error" in ir: print(ir["note"]); return
+        print("领涨板块:", "  ".join(f"{r['industry']}{r['chg_pct']:+}%" for r in ir["领涨"]))
+        print("领跌板块:", "  ".join(f"{r['industry']}{r['chg_pct']:+}%" for r in ir["领跌"]))
+        print(ir["note"])
+    elif cmd == "lhb":  # 龙虎榜因子
+        from lab.ashare_extras import lhb_factor
+        lf = lhb_factor(period=(args[0] if args else "近一月"))
+        if "error" in lf: print(lf["note"]); return
+        print(f"龙虎榜净买额榜({lf['period']}, 共{lf['n']}只):")
+        for r in lf["净买额榜"][:20]: print(f"  {r['code']} {r['name']:8} 净买{r['净买额']}亿 · 上榜{r['上榜次数']}次")
+        print(lf["note"])
+    elif cmd == "events":  # 事件风险
+        from lab.ashare_extras import event_risk
+        ev = event_risk()
+        jj = ev.get("解禁", {})
+        if isinstance(jj, dict) and "error" not in jj:
+            for k, rows in jj.items():
+                if k == "note": continue
+                print(f"== 解禁({k}) =="); [print("  ", r) for r in rows[:12]]
+        else: print("解禁:", jj)
+        print("市场质押:", ev.get("市场质押"))
+    elif cmd == "review-cn":  # A股盘后复盘(市场宽度+情绪)
+        from lab.ashare_extras import market_review
+        mr = market_review()
+        print("市场宽度:", mr.get("市场宽度"))
+        print("情绪周期:", mr.get("情绪周期"))
     else: print(__doc__)
 
 

@@ -27,11 +27,29 @@ python run.py build              # 用 config.json(已是A股预设)构建看板
 
 ## 命令
 ```bash
-python run.py build                  # 构建A股看板(含A股因子:反转/涨跌停/换手)
+python run.py build                  # 构建A股看板(含A股因子:反转/涨跌停/换手/缠论)
 python run.py add 600519 300750      # 加自选
-python run.py ashare                 # A股情报:情绪周期 + 北向 + 龙虎榜(需中国可达网络)
+python run.py ashare                 # A股情报:情绪周期 + 北向 + 龙虎榜
 python run.py review                 # 前向复盘(积累后验证策略)
+# —— A股研究工具(曾被排除,现补齐;需中国可达网络)——
+python run.py screen 10 50 3 20      # 选股筛选器: 价10-50、涨幅3-20%、成交>5亿
+python run.py dossier 600519         # 个股档案: PE/PB分位 + 财务(营收/净利/ROE/负债率)
+python run.py rotation               # 行业轮动: 领涨/领跌板块(资金方向)
+python run.py lhb 近一月              # 龙虎榜因子: 净买额榜(游资/机构反复运作的票)
+python run.py events                 # 事件风险: 未来解禁 + 市场质押
+python run.py review-cn              # 盘后复盘: 市场宽度(涨跌家数) + 情绪周期
 ```
+
+## 已补齐的 A股专属能力(曾因个人看板"IBKR美股专用"被排除)
+| 能力 | 命令/位置 | 实测 |
+|---|---|---|
+| 缠论走势 | build 卡片 / `lab/chanlun.py` | ✅ |
+| 龙虎榜因子 | `run.py lhb` | ✅ 1009只上榜统计 |
+| 个股档案 | `run.py dossier` | ✅ PE/PB分位+财务 |
+| 事件风险(解禁/质押) | `run.py events` | ✅ 解禁日历 |
+| 行业轮动 | `run.py rotation` | ✅ 板块涨跌排名 |
+| 选股筛选器 | `run.py screen` | ✅ 全A 5500+只 |
+| 盘后复盘(宽度+情绪) | `run.py review-cn` | ✅ |
 
 ## 看板上的 A股因子
 每张卡在综合评分下方多一块 **🇨🇳 A股因子**:板块±涨跌停幅、涨停/跌停状态(一字板会提示"买不进")、反转分(超跌反转候选 vs 强势易回吐)、换手率分位、**缠论买卖点**(一买/二买/三买/中枢/背驰)。缠论是自包含引擎(`lab/chanlun.py`),无需外部 skill;缠中说禅本就交易 A 股,故此项在 A 股尤为对味。
