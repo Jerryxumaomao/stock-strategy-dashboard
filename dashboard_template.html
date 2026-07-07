@@ -61,6 +61,65 @@ function stAdv(r){var s=r.state;var t=s?({para:'🔥抛物线(20日+'+s.ret20+'%
  var g=r.gap;
  if(g&&g.cont!=null&&Math.abs(r.chg)>=2){var gt=r.chg>=2?(g.cont<=45?'🔴 今日大涨+'+r.chg+'%别追:该票≥2%跳空延续率仅'+g.cont+'%(n='+g.n_up+')、追入开→收均值'+g.oc_up+'%,fade票的高开=减仓窗口':g.cont>=55?'🟢 今日+'+r.chg+'%可顺势:跳空延续率'+g.cont+'%(n='+g.n_up+'),止损设开盘价下方':'🟡 今日+'+r.chg+'%:跳空无明显倾向('+g.cont+'%),按原计划'):(g.bounce!=null&&g.bounce>=55?'🟢 今日'+r.chg+'%:历史下跳反弹率'+g.bounce+'%,企稳后可按买入区接':'🔴 今日'+r.chg+'%:下跳反弹率'+(g.bounce==null?'样本不足':g.bounce+'%')+',不接飞刀');t=(t?t+'<br>':'')+gt;}
  return t?'<div style="margin-top:6px;font-size:11px;color:#3d3d3a;border-top:1px dashed #e6dfd8;padding-top:5px">'+t+'</div>':''}
+/* Composite entry score v1 — deterministic tier (buy/watch/avoid) from weighted factors.
+   Adapted from the full spec (gates veto first; quality "what to buy" x timing "when";
+   C = 0.55*Q + 0.45*T). Factors renormalized to what THIS payload carries. Missing data
+   always scores NEUTRAL with an honest label — never fabricated, never punished. */
+function composite(r){
+ var s=r.signal||{},bt=r.backtest||{},st=(r.state||{}).st,parts={},gates=[];
+ var x=(r.strategy==='brk'?bt.brk:r.strategy==='brk_atr'?bt.brk_atr:r.strategy==='dip_re'?bt.dip_re:bt.dip)||{};
+ if(r.strategy==='hold'&&r.hold_stats){var cg=r.hold_stats.cagr||0;parts.backtest={v:cg>=40?42:cg>=25?34:20,max:50,why:'长持CAGR '+cg+'%'};}
+ else if(typeof x.expectancy_R==='number'){var E=x.expectancy_R;var v=E>=1?50:E>=0.5?30+(E-0.5)*40:E>=0?10+E*40:0;var w='期望'+E+'R('+x.n+'笔)';if(x.n<5){v=Math.min(v,25);w+='·样本小已压缩'}parts.backtest={v:Math.round(v),max:50,why:w};}
+ else parts.backtest={v:25,max:50,why:'无回测(中性)'};
+ var s2=/Stage ?2|上升/.test(r.stage||''),s4=/Stage ?4|下跌/.test(r.stage||'');
+ parts.position=s2?(r.pct_from_high>=-15?{v:30,max:30,why:'Stage2·距高'+r.pct_from_high+'%'}:r.pct_from_high>=-30?{v:18,max:30,why:'Stage2但回撤'+r.pct_from_high+'%'}:{v:9,max:30,why:'Stage2深回撤'}):s4?{v:0,max:30,why:'下跌阶段'}:{v:12,max:30,why:r.stage||'过渡'};
+ var SQ={tight:[20,'紧平台'],quiet:[16,'低波动'],neutral:[12,'常态'],hot:[4,'过热'],brk:[2,'破位'],para:[0,'抛物线']},sq=SQ[st]||[12,'状态未知(中性)'];
+ parts.structure={v:sq[0],max:20,why:sq[1]};
+ var Q=Math.round(parts.backtest.v+parts.position.v+parts.structure.v);
+ var dv,dw,nearTrig=false;
+ if(s.type==='breakout'&&s.trigger&&r.last){var d2=(s.trigger-r.last)/r.last*100;
+  if(d2<=0){dv=60;dw='已过触发';nearTrig=true}else if(d2<=3){dv=42;dw='距触发+'+d2.toFixed(1)+'%·临界';nearTrig=true}
+  else if(d2<=12){dv=18;dw='距触发+'+d2.toFixed(1)+'%·挂单等'}else{dv=6;dw='距触发+'+d2.toFixed(1)+'%·筑底中'}}
+ else{var z=s.buy_zones&&s.buy_zones[0];
+  if(z&&r.last){var d=(r.last-z)/z*100;
+   if(d<=-8){dv=12;dw='深破买区'+Math.round(d)+'%'}else if(d<=1){dv=60;dw='已进买区'}
+   else if(d<=6){dv=Math.round(60-7*(d-1));dw='近买区+'+d.toFixed(1)+'%'}else{dv=Math.max(0,Math.round(24-2.4*(d-6)));dw='距买区+'+d.toFixed(1)+'%'}}
+  else{dv=6;dw='无买点定义'}}
+ parts.dist={v:dv,max:60,why:dw};
+ var STm={tight:[25,'紧平台·埋伏安全'],quiet:[20,'低波动'],neutral:[15,'常态'],brk:[4,'不接飞刀'],hot:[4,'过热'],para:[0,'抛物线']},stv=STm[st]||[15,'状态未知(中性)'];
+ parts.tstate={v:stv[0],max:25,why:stv[1]};
+ var g=r.gap,gv=10,gw='当日波动小(中性)';
+ if(g&&Math.abs(r.chg)>=2){if(r.chg>=2){gv=g.cont>=55?15:g.cont<=45?3:8;gw='高开延续率'+g.cont+'%'}
+  else{gv=(g.bounce!=null&&g.bounce>=55)?13:(g.bounce!=null&&g.bounce<=45)?4:8;gw='下跳反弹率'+(g.bounce==null?'样本不足':g.bounce+'%')}}
+ parts.gap={v:gv,max:15,why:gw};
+ var T=Math.round(parts.dist.v+parts.tstate.v+parts.gap.v);
+ var C=Math.round(0.55*Q+0.45*T);
+ var hard=false,cap=false,stp=s.stop||s.trend_stop;
+ if(s.type!=='breakout'&&stp&&r.last<=stp){gates.push('⛔破位·信号失效');hard=true}
+ var mk=PAYLOAD.market;if(mk&&!mk.above){gates.push('大盘开关红·禁追涨');cap=true}
+ if((st==='para'||st==='hot')&&nearTrig){gates.push('过热勿追突破');cap=true}
+ var er=(PAYLOAD.earnings||[]).find(e=>e.t===r.ticker);if(er&&er.days<=1){gates.push('财报在即·事件冻结');cap=true}
+ if(r.strategy==='avoid'){gates.push('回测判回避');hard=true}
+ var tier,txt;
+ if(hard){tier='avoid';txt='🔴 '+gates[gates.length-1]}
+ else{tier=(C>=70&&Q>=60&&T>=55)?'buy':C>=45?'watch':'avoid';
+  if(tier==='buy'&&cap){tier='watch';txt='🟡 观察·'+gates[0]}
+  else if(tier==='watch'&&Q>=70&&T<40)txt='🟡 观察·好票等回踩';
+  else if(tier==='watch'&&T>=70&&Q<45)txt='🟡 观察·到价勿接';
+  else txt={buy:'🟢 买入',watch:'🟡 观察',avoid:'🔴 回避'}[tier];}
+ return {Q:Q,T:T,C:C,tier:tier,txt:txt,parts:parts,gates:gates};
+}
+const CPLAB={backtest:'回测期望',position:'阶段位置',structure:'波动结构',dist:'距买点/触发',tstate:'状态灯',gap:'跳空统计'};
+function compoBlock(r){var cp=composite(r);var col=cp.tier==='buy'?'#217a44':cp.tier==='watch'?'#b07d0a':'#c64545';
+ var bg=cp.tier==='buy'?'#e9f5ee':cp.tier==='watch'?'#f8f1df':'#faeceb';
+ var rows=['backtest','position','structure','dist','tstate','gap'].map(function(k){var p=cp.parts[k];var pc=p.v/p.max;var c2=pc>=0.7?'#217a44':pc>=0.4?'#b07d0a':'#c64545';
+  return '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>'+CPLAB[k]+' <span style="color:#6c6a64">'+p.why+'</span></span><b style="color:'+c2+'">'+p.v+'/'+p.max+'</b></div>'}).join('');
+ return '<div style="margin-top:9px;display:flex;justify-content:space-between;align-items:center;font-size:12.5px"><b>综合评分 '+cp.C+'/100</b><span style="font-weight:800;font-size:11px;padding:2px 9px;border-radius:8px;background:'+bg+';color:'+col+'">'+cp.txt+'</span></div>'
+  +'<details style="margin-top:3px;font-size:11px"><summary style="cursor:pointer;color:#6c6a64">评分拆解:质量'+cp.Q+' × 时机'+cp.T+(cp.gates.length?' · 门槛'+cp.gates.length+'项':'')+'</summary>'
+  +'<div style="margin-top:4px"><b style="font-size:10.5px">质量(值不值得买)</b>'+rows+'</div>'
+  +(cp.gates.length?'<div style="margin-top:4px;color:#b07d0a">门槛: '+cp.gates.join(' · ')+'</div>':'')
+  +'<div style="margin-top:4px;color:#6c6a64">C=0.55×质量+0.45×时机;缺数据给中性分并如实标注</div></details>';
+}
 const $=id=>document.getElementById(id);
 $('ttl').textContent=PAYLOAD.title||'Stock Strategy Dashboard';
 $('sub').textContent='更新 '+PAYLOAD.as_of+' · 数据源 '+PAYLOAD.source+' · '+PAYLOAD.tickers.length+' 只 · 决策辅助非投资建议';
@@ -75,7 +134,7 @@ function card(r){var sl=SLAB[r.strategy]||SLAB.avoid;var cc=r.chg>=0?'up':'down'
  return '<div class="card" data-sym="'+r.ticker+'"><div class="top"><div><div class="sym">'+r.ticker+'</div><div class="nm">'+r.stage+' · 波动'+r.vol+'%</div><div><span class="chip '+sl[1]+'">'+sl[0]+'</span>'+stChip(r)+distChip(r)+'</div></div>'+
  '<div><div class="p">'+money(r.last)+'</div><div class="'+cc+'" style="font-size:12px;font-weight:600;text-align:right">'+(r.chg>=0?'▲':'▼')+' '+r.chg+'%</div></div></div>'+
  '<div class="rows"><div class="row"><span class="k">距52周高</span><span class="down">'+r.pct_from_high+'%</span></div>'+(r.bucket?'<div class="row"><span class="k">类别</span><span>'+r.bucket+'</span></div>':'')+'</div>'+
- sigHtml(r)+stAdv(r)+(bt(r)?'<div class="bt">'+bt(r)+'</div>':'')+(r.action?'<div class="act">'+r.action+'</div>':'')+'</div>';}
+ sigHtml(r)+compoBlock(r)+stAdv(r)+(bt(r)?'<div class="bt">'+bt(r)+'</div>':'')+(r.action?'<div class="act">'+r.action+'</div>':'')+'</div>';}
 const order=['brk','brk_atr','dip','dip_re','hold','avoid'];const secName={brk:'📈 宜突破',brk_atr:'📈 突破·宽止损',hold:'🏔️ 长持(正股)',dip:'📉 宜抄底',dip_re:'📉 抄底+再进',avoid:'🚫 回避'};
 const byS={};PAYLOAD.tickers.forEach(r=>{(byS[r.strategy]=byS[r.strategy]||[]).push(r)});
 $('counts').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="count">'+secName[s]+' '+byS[s].length+'</div>').join('');
