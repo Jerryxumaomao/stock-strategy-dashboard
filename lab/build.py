@@ -87,11 +87,13 @@ def build(config=None, source=None, period="5y", verbose=True):
         if is_ashare:  # attach A-share-native factors (reversal/limit/turnover); see lab/ashare.py
             try:
                 from . import ashare as A
+                from . import chanlun as CH
                 rec["ashare"] = {
                     "board": A.board_and_limit(t, rec.get("name", "")),
                     "limit": A.limit_state(b, t, rec.get("name", "")),
                     "reversal": A.reversal_score(b),
                     "turnover": A.turnover_stats(b),
+                    "chan": CH.analyze(b, rec.get("name", "")),   # 缠论(A股原生);见 lab/chanlun.py
                 }
             except Exception as e:
                 if verbose: print(f"  [ashare] {t} factor skip: {e}")
