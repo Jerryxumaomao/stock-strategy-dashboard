@@ -80,20 +80,40 @@ def build(config=None, source=None, period="5y", verbose=True):
     pool_E = _pool_expectancy(barsmap)
     if verbose:
         print("[pool] strategy priors:", {k: round(v, 2) for k, v in pool_E.items()})
+    is_ashare = (source == "akshare") or (cfg.get("market") == "ashare")
     results = []
     for t, b in barsmap.items():
         rec = diagnose(t, b, pool_E=pool_E)
+        if is_ashare:  # attach A-share-native factors (reversal/limit/turnover); see lab/ashare.py
+            try:
+                from . import ashare as A
+                rec["ashare"] = {
+                    "board": A.board_and_limit(t, rec.get("name", "")),
+                    "limit": A.limit_state(b, t, rec.get("name", "")),
+                    "reversal": A.reversal_score(b),
+                    "turnover": A.turnover_stats(b),
+                }
+            except Exception as e:
+                if verbose: print(f"  [ashare] {t} factor skip: {e}")
         results.append(rec)
         if verbose:
             print(f"  {t}: {rec['strategy']:8} {rec.get('bucket','')}  ({rec['stage']}, vol {rec['vol']}%)")
     extras = {}
-    try:  # SPY 200MA market gate (Faber): below the line -> no breakout chasing, half size
-        sb = get_history("SPY", source=source, period=period)
+    try:  # 市场开关: 美股用 SPY 200MA (Faber);A股用沪深300(或config指定的指数)200日线
+        if is_ashare:
+            from .datasource import akshare_index
+            idx = cfg.get("market_gate_index", "sh000300")
+            sb = akshare_index(idx, period=period)
+            gate_name = idx
+        else:
+            sb = get_history("SPY", source=source, period=period)
+            gate_name = "SPY"
         SC = [x["c"] for x in sb]
         if len(SC) >= 200:
             s200 = sum(SC[-200:]) / 200
-            extras["market"] = {"spy": round(SC[-1], 2), "sma200": round(s200, 2),
-                                "above": SC[-1] > s200, "pct": round((SC[-1] / s200 - 1) * 100, 1)}
+            extras["market"] = {"spy": round(SC[-1], 2), "sma200": round(s200, 2), "gate": gate_name,
+                                "above": SC[-1] > s200, "pct": round((SC[-1] / s200 - 1) * 100, 1),
+                                "ashare_note": ("A股择时:指数200日线之外还要看情绪周期(涨停家数/连板/炸板率),退潮期即使在线上也减仓" if is_ashare else "")}
     except Exception as e:
         if verbose: print("[market] skipped:", e)
     try:  # correlation clusters: same cluster ~= same bet, cap 1-2 positions per cluster

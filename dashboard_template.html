@@ -130,11 +130,21 @@ function sigHtml(r){var s=r.signal;if(!s||!s.type)return '';
  if(s.type==='breakout')return '<div class="sig"><div class="t" style="color:#217a44">📈 突破买入</div>突破 &gt; '+money(s.trigger)+' · 止损 '+money(s.stop)+'<br><span style="color:var(--dim)">'+s.status+'</span>'+posSize(s.trigger,s.stop)+'</div>';
  if(s.type==='hold')return '<div class="sig"><div class="t" style="color:#2f7d6b">🏔️ 长持·买便宜(正股·不加杠杆)</div>回踩买入 '+s.buy_zones.map(money).join(' / ')+'<br>目标 '+s.target.map(money).join(' / ')+' · 破 '+money(s.trend_stop)+'(200日线)离场'+posSize(s.buy_zones[0],s.trend_stop)+'</div>';
  return '<div class="sig"><div class="t" style="color:var(--primary)">📉 分批买入区</div>'+s.buy_zones.map(money).join(' / ')+' · 止损 '+money(s.stop)+'<br><span style="color:var(--dim)">'+(s.note||'')+'</span>'+posSize(s.buy_zones[0],s.stop)+'</div>';}
+function ashareBlock(r){var a=r.ashare;if(!a)return '';
+ var parts=[];
+ if(a.board)parts.push('<span style="color:#6c6a64">'+a.board.board+' ±'+a.board.limit_pct+'%</span>');
+ if(a.limit&&a.limit.state!=='normal'){var lc=a.limit.state.indexOf('涨停')>=0?'#c64545':'#217a44';
+   parts.push('<b style="color:'+lc+'">'+a.limit.state+' '+a.limit.chg_pct+'%</b>'+(a.limit.tradable_note?' <span style="color:#c64545;font-size:10px">('+a.limit.tradable_note+')</span>':''));}
+ if(a.reversal){var rc=a.reversal.reversal_score>=60?'#217a44':a.reversal.reversal_score<=30?'#c64545':'#6c6a64';
+   parts.push('反转分 <b style="color:'+rc+'">'+a.reversal.reversal_score+'</b> <span style="color:#6c6a64">('+a.reversal.tag+',过去'+a.reversal.lookback+'日'+a.reversal.past_ret_pct+'%)</span>');}
+ if(a.turnover)parts.push('换手 '+a.turnover.turnover_now_pct+'% <span style="color:#6c6a64">分位'+a.turnover.turnover_percentile+'·'+a.turnover.tag+'</span>');
+ return '<div style="margin-top:8px;padding:7px 9px;background:rgba(204,120,92,.06);border-radius:8px;font-size:11px;line-height:1.7"><b style="color:var(--primary)">🇨🇳 A股因子</b><br>'+parts.join('<br>')+'</div>';
+}
 function card(r){var sl=SLAB[r.strategy]||SLAB.avoid;var cc=r.chg>=0?'up':'down';
  return '<div class="card" data-sym="'+r.ticker+'"><div class="top"><div><div class="sym">'+r.ticker+'</div><div class="nm">'+r.stage+' · 波动'+r.vol+'%</div><div><span class="chip '+sl[1]+'">'+sl[0]+'</span>'+stChip(r)+distChip(r)+'</div></div>'+
  '<div><div class="p">'+money(r.last)+'</div><div class="'+cc+'" style="font-size:12px;font-weight:600;text-align:right">'+(r.chg>=0?'▲':'▼')+' '+r.chg+'%</div></div></div>'+
  '<div class="rows"><div class="row"><span class="k">距52周高</span><span class="down">'+r.pct_from_high+'%</span></div>'+(r.bucket?'<div class="row"><span class="k">类别</span><span>'+r.bucket+'</span></div>':'')+'</div>'+
- sigHtml(r)+compoBlock(r)+stAdv(r)+(bt(r)?'<div class="bt">'+bt(r)+'</div>':'')+(r.action?'<div class="act">'+r.action+'</div>':'')+'</div>';}
+ sigHtml(r)+compoBlock(r)+ashareBlock(r)+stAdv(r)+(bt(r)?'<div class="bt">'+bt(r)+'</div>':'')+(r.action?'<div class="act">'+r.action+'</div>':'')+'</div>';}
 const order=['brk','brk_atr','dip','dip_re','hold','avoid'];const secName={brk:'📈 宜突破',brk_atr:'📈 突破·宽止损',hold:'🏔️ 长持(正股)',dip:'📉 宜抄底',dip_re:'📉 抄底+再进',avoid:'🚫 回避'};
 const byS={};PAYLOAD.tickers.forEach(r=>{(byS[r.strategy]=byS[r.strategy]||[]).push(r)});
 $('counts').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="count">'+secName[s]+' '+byS[s].length+'</div>').join('');

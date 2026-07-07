@@ -145,6 +145,20 @@ def main():
             else: print(" ", rows)
         print("== options UOA (vol>=3x OI) ==")
         for u in m["uoa"]: print(f"  {u['t']:6} {u['kind']} {u['expiry']} ${u['k']}  vol {u['vol']} / oi {u['oi']} = {u['ratio']}x  ${u['prem_m']}M")
+    elif cmd == "ashare":  # A股情报: 情绪周期 + 北向 + 龙虎榜(见 docs/A股量化知识手册.md)
+        from lab import ashare as A
+        print("== 市场情绪周期(涨停家数/连板/炸板率) ==")
+        print("  ", A.sentiment_gauge())
+        print("== 北向资金(近10日净流入,亿元) ==")
+        nb = A.northbound_flow()
+        if isinstance(nb, list):
+            for r in nb: print(f"  {r['date']}  {r['net_in_yi']:+.1f}亿")
+        else: print("  ", nb)
+        print("== 龙虎榜(今日) ==")
+        lhb = A.dragon_tiger()
+        if isinstance(lhb, list):
+            for r in lhb[:15]: print("  ", r)
+        else: print("  ", lhb)
     else: print(__doc__)
 
 
