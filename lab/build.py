@@ -96,6 +96,7 @@ def build(config=None, source=None, period="5y", verbose=True):
             try:
                 from . import chanlun as CH
                 from . import backtest_cn as BC
+                from . import daban as DB
                 rec["ashare"] = {
                     "board": A.board_and_limit(t, rec.get("name", "")),
                     "limit": A.limit_state(b, t, rec.get("name", "")),
@@ -103,6 +104,7 @@ def build(config=None, source=None, period="5y", verbose=True):
                     "turnover": A.turnover_stats(b),
                     "chan": CH.analyze(b, rec.get("name", "")),   # 缠论(A股原生);见 lab/chanlun.py
                     "friction": (BC.friction_report(b, cn_lim) if len(b) >= 250 else None),  # 涨跌停摩擦
+                    "daban": DB.daban_scan(b, cn_lim, rec.get("name", "")),  # 打板状态(首板/连板/炸板)
                 }
             except Exception as e:
                 if verbose: print(f"  [ashare] {t} factor skip: {e}")

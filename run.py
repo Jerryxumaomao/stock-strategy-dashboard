@@ -207,6 +207,34 @@ def main():
         mr = market_review()
         print("市场宽度:", mr.get("市场宽度"))
         print("情绪周期:", mr.get("情绪周期"))
+    elif cmd == "daban":  # 打板: 扫自选当前首板/连板 + 打板胜率与尾部风险回测
+        from lab import daban as DB
+        from lab.ashare import board_and_limit
+        cfg = _cfg(); src = cfg.get("source", "akshare")
+        print("⚠️ 打板是A股最高风险流派,散户多亏(次日高开低走);以下仅供认识风险,非鼓励打板。\n")
+        print("== 自选当前打板状态 ==")
+        for t in cfg.get("watchlist", []):
+            try:
+                b = get_history(t, source=src)
+                lim = board_and_limit(t, "")["limit_pct"] / 100
+                sc = DB.daban_scan(b, lim, "")
+                if sc.get("state") not in ("无", "数据不足"):
+                    print(f"  {t}: [{sc['state']}] {sc.get('signal', '')}")
+            except Exception:
+                continue
+        print("\n== 打板胜率回测(样例池,看尾部风险不是均值) ==")
+        for t in (args or cfg.get("watchlist", [])[:5]):
+            try:
+                b = get_history(t, source=src)
+                lim = board_and_limit(t, "")["limit_pct"] / 100
+                bt = DB.daban_backtest(b, lim, "all")
+                if bt["n"] >= 5:
+                    flag = " ⚠️小样本" if bt.get("小样本存疑") else ""
+                    print(f"  {t}: {bt['n']}次{flag} · 次日均值{bt['次日收盘卖_均值%']}% 胜率{bt['次日收盘卖_胜率%']}% · 次日最差{bt['次日最差%']}% 跌超5%占比{bt['次日跌超5%占比%']}% · 续板率{bt['续板率%']}%")
+            except Exception:
+                continue
+        print("\n" + DB.daban_backtest.__doc__.strip().split("\n")[0])
+        print("均值正≠能赚:强封板买不进(能成交的偏弱=幸存者偏差)、退潮期反转、未含滑点。务必配合 review-cn 看情绪周期。")
     else: print(__doc__)
 
 

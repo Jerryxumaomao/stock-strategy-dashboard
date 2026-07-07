@@ -143,6 +143,8 @@ function ashareBlock(r){var a=r.ashare;if(!a)return '';
  else if(a.chan&&a.chan.state)parts.push('<span style="color:#6c6a64">缠论: '+a.chan.state+'</span>');
  var f=a.friction;if(f&&(f.sealed_up_days||f.sealed_dn_days||f.brk_skipped_sealed_up||f.limit_trapped_exits))
    parts.push('<span style="color:#b07d0a">⚠️涨跌停摩擦 封涨停'+f.sealed_up_days+'天/封跌停'+f.sealed_dn_days+'天'+(f.brk_skipped_sealed_up?'·买不进跳过'+f.brk_skipped_sealed_up+'次':'')+(f.limit_trapped_exits?'·跌停困住'+f.limit_trapped_exits+'次':'')+'</span>');
+ var db=a.daban;if(db&&db.state&&db.state!=='无'&&db.state!=='数据不足'){var dc=db.cls==='sell'?'#c64545':db.cls==='buy'?'#c64545':'#b07d0a';
+   parts.push('<span style="color:'+dc+';font-weight:700">🎯打板 '+db.state+'</span>'+(db.signal?'<br><span style="color:#c64545;font-size:10px">'+db.signal+'</span>':''));}
  return '<div style="margin-top:8px;padding:7px 9px;background:rgba(204,120,92,.06);border-radius:8px;font-size:11px;line-height:1.7"><b style="color:var(--primary)">🇨🇳 A股因子</b><span style="color:#6c6a64;font-size:9.5px"> · 回测已含T+1+涨跌停</span><br>'+parts.join('<br>')+'</div>';
 }
 function card(r){var sl=SLAB[r.strategy]||SLAB.avoid;var cc=r.chg>=0?'up':'down';
