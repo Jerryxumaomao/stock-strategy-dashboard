@@ -35,6 +35,17 @@ python run.py options NVDA             # options: vol cone + implied-vs-realized
 python run.py audit                    # discipline score: your real trades vs frozen recs
 open dashboard.html                    # (or double-click) — self-contained
 ```
+
+### One-click refresh (in-page button)
+Prefer clicking over re-running `build`? Serve the dashboard locally and use the top-right
+**🔄 refresh** button:
+```bash
+python serve.py                        # starts a local server + opens the browser (or double-click serve.bat on Windows)
+```
+Click 🔄 → it runs `run.py build` in the background, a progress bar advances per diagnosed
+ticker, and the page auto-reloads when done. The button only works over the local server
+(http); opened as a bare file (`file://`) it greys out. Failures show honestly on the bar,
+never faked.
 Set `capital` and `risk_pct` in `config.json` — every signal then shows a **position size**
 (risk budget ÷ stop distance). For `audit`, export your fills to `history/trades.json`
 (format documented in `lab/audit.py`) — execution drift, not signal quality, is usually
