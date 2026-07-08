@@ -221,4 +221,40 @@ $('body').innerHTML=order.filter(s=>byS[s]).map(s=>'<div class="sec">'+secName[s
  el.innerHTML=' · <b style="color:'+c+'">'+s+'</b>(美东实时)';}
  try{paint();setInterval(paint,60000)}catch(e){}})();
 $('foot').innerHTML='<b>方法:</b> 每只票诊断趋势阶段/波动率,回测"回踩抄底"与"突破追涨"两策略,分配历史正期望者(否则回避并给类别对策);出场跟随SMA50让赢家跑。<br><b>诚实:</b> 规则代理非严格缠论,样本内、历史不代表未来,价值在验证期望与纪律。非投资建议。';
-</script></body></html>
+</script>
+<!-- 刷新按钮+进度条(仅经 serve.py 本地服务器 http 打开时可用;file:// 双击时变灰提示) -->
+<div id="rfBar" style="position:fixed;top:12px;right:16px;z-index:9999;font-family:var(--sans,system-ui,sans-serif)">
+  <button id="rfBtn" style="background:var(--primary,#cc785c);color:#fff;border:none;padding:8px 15px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(20,20,19,.18)">🔄 刷新数据</button>
+  <div id="rfProg" style="display:none;margin-top:7px;width:230px;background:var(--panel,#fffdf7);border:1px solid var(--border,#e6dfd8);border-radius:10px;padding:9px 11px;box-shadow:0 3px 12px rgba(20,20,19,.18)">
+    <div id="rfStage" style="font-size:11px;color:var(--dim,#6c6a64);margin-bottom:6px">准备…</div>
+    <div style="height:8px;background:var(--chip,#efe9de);border-radius:5px;overflow:hidden"><div id="rfFill" style="height:100%;width:0%;background:var(--primary,#cc785c);transition:width .4s ease"></div></div>
+  </div>
+</div>
+<script>
+(function(){
+  var http=location.protocol==='http:'||location.protocol==='https:';
+  var btn=document.getElementById('rfBtn'),prog=document.getElementById('rfProg'),stg=document.getElementById('rfStage'),fill=document.getElementById('rfFill');
+  if(!btn)return;
+  if(!http){ btn.textContent='🔄 刷新(需服务器)';btn.style.background='#9a9a9a';
+    btn.onclick=function(){alert('刷新按钮需通过本地服务器打开才能用:\n命令行跑  python serve.py  (会起服务器并打开浏览器),别直接双击 dashboard.html。');};
+    return; }
+  var poll=null,creep=null,shown=0,ceil=8;
+  function paint(){ fill.style.width=shown.toFixed(1)+'%'; }
+  function setCeil(p){ ceil=(p>=100?100:p>=90?97:p>=12?88:8); if(shown<p)shown=p; }
+  btn.onclick=async function(){
+    if(btn.disabled)return; btn.disabled=true;btn.style.opacity='.6';prog.style.display='block';stg.style.color='var(--dim,#6c6a64)';
+    shown=3;ceil=8;paint();stg.textContent='启动…';
+    creep=setInterval(function(){ if(shown<ceil){shown=Math.min(ceil,shown+Math.max(0.3,(ceil-shown)*0.04));paint();} },170);
+    try{ var j=await (await fetch('/refresh',{method:'POST'})).json(); if(j.busy)stg.textContent='已有刷新在跑…'; }
+    catch(e){ clearInterval(creep);stg.style.color='#c64545';stg.textContent='❌ 连不上服务器';btn.disabled=false;btn.style.opacity='1';return; }
+    poll=setInterval(async function(){
+      try{ var s=await (await fetch('/status')).json();
+        if(s.stage)stg.textContent=s.stage; setCeil(s.pct);
+        if(s.error){clearInterval(poll);clearInterval(creep);stg.style.color='#c64545';stg.textContent='❌ '+s.error;btn.disabled=false;btn.style.opacity='1';}
+        else if(s.done){clearInterval(poll);clearInterval(creep);shown=100;paint();stg.textContent='✅ 完成,重载…';setTimeout(function(){location.reload();},700);}
+      }catch(e){}
+    },800);
+  };
+})();
+</script>
+</body></html>
