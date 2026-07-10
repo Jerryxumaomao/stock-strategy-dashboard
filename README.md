@@ -26,7 +26,7 @@ plain Python CLI.
 ### As a CLI
 ```bash
 pip install -r requirements.txt        # only yfinance (free Yahoo data)
-python run.py init                     # enter your watchlist
+python run.py init                     # ①选数据源(无券商接口→默认 Yahoo 免费)②输入你的标的代码
 python run.py diagnose NVDA            # one-stock diagnosis
 python run.py add PLTR                 # add a stock (auto-diagnosed)
 python run.py build                    # rebuild dashboard.html
@@ -35,6 +35,32 @@ python run.py options NVDA             # options: vol cone + implied-vs-realized
 python run.py audit                    # discipline score: your real trades vs frozen recs
 open dashboard.html                    # (or double-click) — self-contained
 ```
+
+### 看板模块与数据源(哪些开箱即用,哪些要接数据)
+看板与作者私版**同一渲染层**:信号灯(🟢可买/🟡等待/🔴回避)、每卡操作建议、综合评分(质量×时机
++逐项拆解弹窗)、缠论结构引擎(MA/摆动/中枢/买卖区/止损,确定性计算)、每日操作复盘。
+**没有数据的模块不会消失——保留但标灰**,并提示需要连接哪种数据接口;接上后自动点亮:
+
+| 模块 | Yahoo 免费数据 | 需要额外接入 |
+|---|---|---|
+| 自选诊断/缠论/评分/操作建议/买卖区 | ✅ 开箱即用 | — |
+| 大盘开关/相关簇/财报日历/暗盘SVR/异动 | ✅(Yahoo/FINRA 免费) | — |
+| 持仓卡+每日复盘 | 手动:config.json 填 `"positions":[{"sym":"NVDA","qty":10,"avgCost":100}]` | 或接券商接口 |
+| 账户(净值/杠杆/购买力) | ❌ 标灰 | 券商接口(如 IBKR) |
+| 期权 Top10 扫描 | config 设 `"top10": true`(Yahoo 链,较慢) | 券商实时链更准 |
+| 盘前盘后/暗盘大单 | ❌ 标灰 | 本地 TWS API(可选:`run.py extended / darkprints`) |
+| 情报流/研报 | ❌ 标灰 | 自行接入新闻/研报源(或让你的 agent 定期写入) |
+
+### One-click refresh (in-page button)
+Prefer clicking over re-running `build`? Serve the dashboard locally and use the top-right
+**🔄 refresh** button:
+```bash
+python serve.py                        # starts a local server + opens the browser (or double-click serve.bat on Windows)
+```
+Click 🔄 → it runs `run.py build` in the background, a progress bar advances per diagnosed
+ticker, and the page auto-reloads when done. The button only works over the local server
+(http); opened as a bare file (`file://`) it greys out. Failures show honestly on the bar,
+never faked.
 Set `capital` and `risk_pct` in `config.json` — every signal then shows a **position size**
 (risk budget ÷ stop distance). For `audit`, export your fills to `history/trades.json`
 (format documented in `lab/audit.py`) — execution drift, not signal quality, is usually

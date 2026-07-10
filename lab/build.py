@@ -153,7 +153,7 @@ def build(config=None, source=None, period="5y", verbose=True):
         if verbose: print("[dark] FINRA SVR scanned" if dp else "[dark] no data")
     except Exception as e:
         if verbose: print("[dark] skipped:", e)
-    render(results, cfg, extras)
+    render(results, cfg, extras, barsmap=barsmap)
     try:
         from .review import freeze, run_review
         print("[freeze]", freeze(results, ROOT, spy_last=(extras.get("market") or {}).get("spy")))
@@ -163,25 +163,21 @@ def build(config=None, source=None, period="5y", verbose=True):
     return results
 
 
-def render(results, cfg, extras=None):
+def render(results, cfg, extras=None, barsmap=None):
     tmpl_path = os.path.join(ROOT, "dashboard_template.html")
     with open(tmpl_path, encoding="utf-8") as f:
         tmpl = f.read()
-    payload = {"title": cfg.get("title", "Stock Strategy Dashboard"),
-               "as_of": time.strftime("%Y-%m-%d %H:%M"),
-               "source": cfg.get("source", "yahoo"),
-               "capital": cfg.get("capital", 10000),
-               "risk_pct": cfg.get("risk_pct", 1.5),
-               "tickers": results}
-    if extras:
-        payload.update(extras)
+    extras = dict(extras or {})
     if cfg.get("movers", True):
         try:
             from .movers import get_movers
-            payload["movers"] = get_movers()
+            extras["movers"] = get_movers()
             print("[movers] market radar scanned")
         except Exception as e:
             print("[movers] skipped:", e)
+    # 私人 DATA schema 装配(信号灯/操作行/复盘/评分与私人看板同一渲染层;缺数据模块留空→标灰)
+    from .engines import assemble_payload
+    payload = assemble_payload(results, cfg, extras, barsmap or {})
     # Replace the WHOLE marker including its {} placeholder — swapping only the comment
     # leaves `{json}{}` behind, a SyntaxError that renders the dashboard blank.
     html = tmpl.replace("/*__DATA__*/{}", json.dumps(payload, ensure_ascii=False))
