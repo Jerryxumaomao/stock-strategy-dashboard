@@ -717,7 +717,7 @@ function renderTopp(){
   out.sort(function(a,b){return b.score-a.score});var top=out.slice(0,5);
   var SL={brk:'📈突破',brk_atr:'📈突破·宽止损',hold:'🏔️长持',dip:'📉抄底',dip_re:'📉抄底+再进'};
   var STL2={para:'🔥',hot:'🔥',brk:'⚠️',tight:'🛡️',quiet:'😴',neutral:'·'};
-  var mk=DATA.market;var mkHtml=mk?'<div class="intel-item" style="border-left-color:'+(mk.above?'var(--green)':'var(--red)')+'"><div class="intel-t">'+(mk.above?'🟢 大盘开关:SPY $'+mk.spy+' 在200日线上方(+'+mk.pct+'%)——允许追涨/正常仓位':'🔴 大盘开关:SPY $'+mk.spy+' 跌破200日线('+mk.pct+'%)——禁用突破追涨·总仓位减半(Faber)')+'</div></div>':'';
+  var mk=DATA.market;var mkHtml=mk?'<div class="intel-item" style="border-left-color:'+(mk.above?'var(--green)':'var(--red)')+'"><div class="intel-t">'+(mk.above?'🟢 大盘开关:'+(mk.gate||'SPY')+' '+mk.spy+' 在200日线上方(+'+mk.pct+'%)——允许追涨/正常仓位':'🔴 大盘开关:'+(mk.gate||'SPY')+' '+mk.spy+' 跌破200日线('+mk.pct+'%)——禁用突破追涨·总仓位减半(Faber)')+'</div></div>':'';
   var pr=DATA.portRisk;var prHtml=pr?'<div class="intel-note">📐 <b>组合总风险(w′Σw)</b>:日波动 ±$'+pr.daily_usd+'('+pr.daily_pct+'%净值) · '+esc(pr.note)+'</div>':'';
   var mc=(DATA.macroCal||[]);var today7=new Date();var mcHtml='';try{var soon=mc.filter(function(e){var d=new Date(e.date);var diff=(d-today7)/864e5;return diff>=-0.5&&diff<=7});if(soon.length)mcHtml='<div class="intel-note">📅 <b>近期宏观/事件(7天内)</b>:'+soon.map(function(e){return e.date.slice(5)+' '+esc(e.ev)+'['+esc(e.impact)+']'}).join(' · ')+'</div>';}catch(er){}
 var corrHtml=(DATA.corr&&DATA.corr.length)?'<div class="intel-note">⚠️ <b>相关簇限仓</b>(120日相关&gt;0.7,同簇≈同一注,每簇最多1-2个仓位):'+DATA.corr.map(function(c){return '['+c.join(' ')+']'}).join(' · ')+'</div>':'';

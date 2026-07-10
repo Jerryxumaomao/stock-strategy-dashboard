@@ -63,6 +63,9 @@ h = re.sub(r"1\. 刷新行情 \+ 情报[^<]*<br>", "1. <b>python run.py build</b
 # 2d. asOf 行补数据源徽标(渲染时读 DATA.source)
 h = h.replace("决策辅助,非投资建议", "决策辅助,非投资建议 · 数据源:<span id=srcTag></span>", 1)
 
+# 2e. 大盘开关标签通用化(美股=SPY,A股=沪深300等;读 DATA.market.gate)
+h = h.replace("大盘开关:SPY $'+mk.spy", "大盘开关:'+(mk.gate||'SPY')+' '+mk.spy")
+
 # ── 3. 注入 灰化系统 + 首跑横幅 ──
 _GREY = r"""
 <script>

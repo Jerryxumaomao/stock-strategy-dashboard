@@ -223,7 +223,7 @@ def composite(sym, s, stratmap, breakout, holdlv, per_ticker, states, market, to
     if s.get("stop") and s.get("last") is not None and s["last"] <= s["stop"]:
         gates.append({"id": "G1", "txt": f"⛔破位·信号失效(价{s['last']}≤止损{s['stop']})"}); hard_avoid = True
     if market and not market.get("above"):
-        gates.append({"id": "G2", "txt": "大盘开关红(SPY破200日线)·禁追涨仓位减半"}); cap_watch = True
+        gates.append({"id": "G2", "txt": f"大盘开关红({market.get('gate') or 'SPY'}破200日线)·禁追涨仓位减半"}); cap_watch = True
     if st in ("para", "hot") and near_trigger:
         gates.append({"id": "G3", "txt": "过热状态勿追突破,只等回踩"}); cap_watch = True
     if cc == "sell":
@@ -336,6 +336,34 @@ def assemble_payload(results, cfg, extras, barsmap):
              "stage": rec.get("stage"), "pass": rec.get("tt_pass"), "fromHigh": rec.get("pct_from_high"),
              "note": rec.get("action") or ""}
         s.update(chan)
+        # —— A股增强(ashare 分支):原生缠论(笔/中枢/背驰)覆盖结构判断;价位仍用结构引擎买卖区 ——
+        ash = rec.get("ashare") or {}
+        ch = ash.get("chan") or {}
+        if ch.get("mode") == "chan":
+            CLS_MAP = {"buy1": "buy_candidate", "buy3": "buy_candidate", "neutral": "neutral",
+                       "break": "pending", "sell": "sell"}
+            s["chanMode"] = "chanlun_native"
+            s["chanState"] = ch.get("state") or s.get("chanState")
+            if ch.get("signal"):
+                s["chanSignal"] = ch["signal"]
+            if ch.get("cls") in CLS_MAP:
+                s["chanClass"] = CLS_MAP[ch["cls"]]
+        if ash:
+            bits = []
+            bd = ash.get("board") or {}
+            if bd.get("board"):
+                bits.append(f"{bd['board']}{'±' + str(bd.get('limit_pct')) + '%' if bd.get('limit_pct') else ''}" + ("·ST⚠️" if bd.get("st") else ""))
+            lm = ash.get("limit") or {}
+            if lm.get("state") and lm["state"] not in ("normal", "无"):
+                bits.append(f"今日{lm['state']}")
+            tv = ash.get("turnover") or {}
+            if tv.get("turnover_now_pct") is not None:
+                bits.append(f"换手{tv['turnover_now_pct']}%(分位{tv.get('turnover_percentile', '—')})")
+            db = ash.get("daban") or {}
+            if db.get("mode") and db.get("n"):
+                bits.append(f"打板样本{db['n']}·续板率{db.get('续板率%', '—')}%·次日最差{db.get('次日最差%', '—')}%")
+            if bits:
+                s["note"] = "【A股】" + " · ".join(bits) + ("。" + s["note"] if s["note"] else "")
         signals[sym] = s
 
     market = extras.get("market")
@@ -391,8 +419,10 @@ def assemble_payload(results, cfg, extras, barsmap):
 
     alerts = []
     if market:
+        gate = market.get("gate") or "SPY"
         alerts.append(["green" if market.get("above") else "red",
-                       f"大盘开关:SPY ${market.get('spy')} {'在200日线上方(+'+str(market.get('pct'))+'%),允许正常仓位' if market.get('above') else '跌破200日线('+str(market.get('pct'))+'%),禁追涨·仓位减半(Faber)'}"])
+                       f"大盘开关:{gate} {market.get('spy')} {'在200日线上方(+'+str(market.get('pct'))+'%),允许正常仓位' if market.get('above') else '跌破200日线('+str(market.get('pct'))+'%),禁追涨·仓位减半(Faber)'}"
+                       + (("<br>" + market["ashare_note"]) if market.get("ashare_note") else "")])
     if extras.get("clusters"):
         alerts.append(["blue", "<b>相关簇限仓</b>:高相关票≈同一注,每簇最多1-2个仓位:" +
                        " · ".join("[" + " ".join(c) + "]" for c in extras["clusters"][:4])])
