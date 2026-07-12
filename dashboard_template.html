@@ -141,6 +141,13 @@
   .titem .ttxt{color:var(--body);flex:1;line-height:1.5;min-width:180px}
   .titem .tplan{margin-top:6px;font-size:11px;font-weight:600;color:var(--txt);background:rgba(0,0,0,.035);border-radius:6px;padding:5px 9px}
   .dreview .dnote{font-size:10.5px;color:var(--dim);font-style:italic;margin-top:11px;line-height:1.5}
+  /* 今日决策卡专属 */
+  .denv{font-size:11.5px;color:var(--body);background:var(--panel2);border-radius:8px;padding:8px 12px;margin-bottom:11px;line-height:1.8}
+  .denv .sep{color:var(--border)}
+  .dpx{margin-top:10px;font-size:11.5px;color:var(--dim);line-height:2}
+  .pxchip{font-size:11px;font-weight:700;background:var(--chip);color:var(--body);border:1px solid var(--border);padding:2px 9px;border-radius:14px;cursor:pointer;white-space:nowrap}
+  .pxchip:hover{border-color:var(--primary);color:var(--primary)}
+  .titem .tsrc{font-size:9.5px;font-weight:700;color:var(--dim);border:1px solid var(--border);border-radius:6px;padding:0 5px;white-space:nowrap}
   /* 卡片内·今日操作 */
   .pact{margin-top:8px;font-size:11.5px;padding:7px 10px;border-radius:8px;border-left:3px solid;line-height:1.55}
   .pact b{font-weight:800;margin-right:5px}
@@ -230,7 +237,8 @@
   </div>
 
   <div class="tabbar" id="tabbar">
-    <button class="tab on" data-tab="home">💼 持仓</button>
+    <button class="tab on" data-tab="decision">🏠 今日决策</button>
+    <button class="tab" data-tab="home">💼 持仓</button>
     <button class="tab" data-tab="news">📰 资讯 <span class="tb-badge" id="newsBadge"></span></button>
     <button class="tab" data-tab="watch">📋 自选</button>
     <button class="tab" data-tab="bt">🔬 回测</button>
@@ -239,13 +247,15 @@
     <button class="tab" data-tab="guide">📖 策略</button>
   </div>
 
-  <div class="tab-panel active" id="tab-home">
+  <div class="tab-panel active" id="tab-decision">
     <div class="acct" id="acct"></div>
+    <div id="decisionBox"></div>
+    <div id="decisionBuys"></div>
+    <div id="decisionOpts"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-home">
     <div class="summary" id="summary"></div>
-    <div class="alerts" id="alerts"></div>
-    <div id="dailyReview"></div>
-    <div class="section-title" style="color:var(--primary)">🏆 今日最佳机会 · A+ Setups</div>
-    <div id="toppBox"></div>
     <div class="section-title">持仓 · Positions</div>
     <div class="grid" id="posGrid"></div>
     <div class="section-title" style="color:var(--red)">⚖️ 执行审计 · 纪律分</div>
@@ -360,9 +370,7 @@ $("summary").innerHTML=[
   `🟢 接近买点 <b>${nearCnt}</b>`,`💎 便宜期权 <b>${cheapCnt}</b>`
 ].map(s=>`<span class="stat">${s}</span>`).join("");
 
-/* alerts —— 全数据驱动(build 按数据情况生成组合级提示) */
-const alerts=(DATA.alerts||[]);
-$("alerts").innerHTML=alerts.map(al=>`<div class="alert ${al[0]}">${al[1]}</div>`).join("");
+/* (原 alerts/复盘块/toppBox 三个分散块已合并进「今日决策卡」renderDecision —— 结论先行,一处看全) */
 
 /* full card (positions) */
 function ivBadges(p){
@@ -410,25 +418,61 @@ function card(p){
 }
 $("posGrid").innerHTML=DATA.positions.map(card).join("");
 
-/* 每日操作复盘 */
-function renderDailyReview(){
-  var R=DATA.dailyReview; if(!R){$("dailyReview").innerHTML="";return;}
+/* ===== 🎯 今日决策卡(结论先行·全站唯一行动清单;吸收原 alerts/复盘块/toppBox)===== */
+function renderDecision(){
+  var R=DATA.decision; var box=$("decisionBox"); if(!R){if(box)box.innerHTML="";return;}
   var C=R.counts||{};
-  var chips='<span class="dchip u">紧急 '+(C.urgent||0)+'</span><span class="dchip t">减仓 '+(C.trim||0)+'</span>'+((C.add||0)?'<span class="dchip a">可加 '+C.add+'</span>':'')+'<span class="dchip h">持有 '+(C.hold||0)+'</span>';
-  var todo;
-  if(R.todo&&R.todo.length){
-    todo='<div class="dtodo"><div class="tt">📌 今日待办 · 要动的仓（'+R.todo.length+'）</div>'+R.todo.map(function(t){
+  var chips='<span class="dchip u">紧急 '+(C.urgent||0)+'</span><span class="dchip t">减仓 '+(C.trim||0)+'</span><span class="dchip a">可动手 '+(C.act||0)+'</span><span class="dchip h">盯价 '+(C.px||0)+'</span>';
+  /* 环境一行: 大盘开关 + 组合风险 + 杠杆 + 7天宏观(全部直读现有 DATA 字段,不复制数据) */
+  var env=[];
+  var mk=DATA.market;
+  if(mk) env.push(mk.above?'🟢大盘:SPY在200日线上+'+mk.pct+'%':'🔴大盘:SPY破200日线'+mk.pct+'%·禁追涨仓位减半');
+  var pr=DATA.portRisk; if(pr&&pr.daily_usd!=null) env.push('组合日波动±$'+pr.daily_usd+'('+pr.daily_pct+'%)');
+  var acc=DATA.account; if(acc&&acc.leverage!=null&&!(acc.leverage<=1.05&&acc.cash>0)) env.push('⚠️杠杆'+acc.leverage+'x·注意保证金');
+  try{var now7=new Date();var soon=(DATA.macroCal||[]).filter(function(e){var d=(new Date(e.date)-now7)/864e5;return d>=-0.5&&d<=7});
+    if(soon.length)env.push('📅 '+soon.slice(0,3).map(function(e){return e.date.slice(5)+' '+esc(e.ev).slice(0,14)}).join('/'));}catch(er){}
+  if(DATA.corr&&DATA.corr.length)env.push('⚠️相关簇'+DATA.corr.length+'组(同簇≈同一注,每簇≤2仓)');
+  var envHtml=env.length?'<div class="denv">'+env.join('<span class="sep"> · </span>')+'</div>':'';
+  /* 行动清单(持仓+自选合并) */
+  var acts;
+  if(R.acts&&R.acts.length){
+    acts=R.acts.map(function(t){
       var lbl=(t.label&&t.label!=="正股")?'<span class="tlbl">'+esc(t.label)+'</span>':'';
+      var src='<span class="tsrc">'+esc(t.src||'')+'</span>';
       var pl=t.plan?'<div class="tplan">🎯 '+esc(t.plan)+'</div>':'';
-      return '<div class="titem '+t.cls+'"><div class="titop"><span class="tsym">'+esc(t.sym)+'</span>'+lbl+'<span class="ttag">【'+esc(t.tag)+'】</span><span class="ttxt">'+esc(t.text)+'</span></div>'+pl+'</div>';
-    }).join('')+'</div>';
+      return '<div class="titem '+t.cls+'"><div class="titop"><span class="tsym">'+esc(t.sym)+'</span>'+lbl+src+'<span class="ttag">【'+esc(t.tag)+'】</span><span class="ttxt">'+esc(t.text)+'</span></div>'+pl+'</div>';
+    }).join('');
   }else{
-    todo='<div class="dtodo"><div class="tt">📌 今日待办</div><div style="font-size:12px;color:var(--dim);padding:4px 2px">无紧急操作,持仓维持观望即可。</div></div>';
+    acts='<div style="font-size:12px;color:var(--dim);padding:4px 2px">今天没有要动手的仓位:持有的守规则,想买的等到价。</div>';
   }
+  /* 盯价清单(到价才买的,一行) */
+  var px=(R.watchPx&&R.watchPx.length)?'<div class="dpx">⏳ 盯价:'+R.watchPx.map(function(w){return '<span class="pxchip" data-jump="'+w.sym+'">'+w.sym+' '+w.word+'$'+w.px+'</span>'}).join(' ')+'</div>':'';
   var brief=R.brief?'<div class="dbrief">📝 '+esc(R.brief)+'</div>':'';
-  $("dailyReview").innerHTML='<div class="dreview"><div class="dhead"><div class="dtitle">📋 每日操作复盘</div><div class="dcounts">'+chips+'</div></div>'+brief+todo+'<div class="dnote">'+esc(R.note||'')+'</div></div>';
+  box.innerHTML='<div class="dreview"><div class="dhead"><div class="dtitle">🎯 今日决策</div><div class="dcounts">'+chips+'</div></div>'+brief+envHtml+acts+px+'<div class="dnote">'+esc(R.note||'')+'</div></div>';
+  box.querySelectorAll('.pxchip').forEach(function(ch){ch.addEventListener('click',function(){switchTab('watch');setTimeout(function(){var el=document.querySelector('#watchWrap [data-sym="'+ch.dataset.jump+'"]');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.outline='2px solid var(--primary)';setTimeout(function(){el.style.outline=''},1500)}},80)})});
+  /* 买入档股票(评分tier=buy 完整清单;点击跳自选卡) */
+  var bb=$("decisionBuys");
+  if(bb){
+    var bl=R.buyList||[];
+    bb.innerHTML='<div class="dreview"><div class="dhead"><div class="dtitle">💼 可买入的票(综合评分买入档 '+bl.length+')</div></div>'+
+      (bl.length?bl.map(function(x){
+        return '<div class="titem do"><div class="titop"><span class="tsym pxchip" data-jump="'+esc(x.sym)+'">'+esc(x.sym)+'</span>'+(x.held?'<span class="tlbl">●持仓</span>':'')+'<span class="ttag" style="color:#217a44">'+x.C+'分【'+esc(x.tag)+'】</span><span class="ttxt">'+esc(x.text)+'</span></div></div>';
+      }).join(''):'<div style="font-size:12px;color:var(--dim);padding:4px 2px">今天没有买入档的票——观察档到价也别急,等评分与价位同时就绪。</div>')+'</div>';
+    bb.querySelectorAll('.pxchip').forEach(function(ch){ch.addEventListener('click',function(){switchTab('watch');setTimeout(function(){var el=document.querySelector('#watchWrap [data-sym="'+ch.dataset.jump+'"]');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.outline='2px solid var(--primary)';setTimeout(function(){el.style.outline=''},1500)}},80)})});
+  }
+  /* 可买期权(Top10里无⛔门槛的;完整榜单在🎯期权tab) */
+  var ob=$("decisionOpts");
+  if(ob){
+    var op=R.optPicks||[];
+    ob.innerHTML='<div class="dreview"><div class="dhead"><div class="dtitle">💎 可买的期权(Top10通过门槛 '+op.length+')</div><div style="font-size:10px;color:var(--dim)">'+esc(R.optAsOf||'')+'</div></div>'+
+      (op.length?('<table style="width:100%;font-size:11.5px;border-collapse:collapse">'+
+        '<tr style="color:var(--dim);text-align:left"><th style="padding:4px 6px">标的</th><th>到期</th><th>行权</th><th>权利金</th><th>EV</th><th>胜率</th><th>备注</th></tr>'+
+        op.map(function(r){return '<tr style="border-top:1px solid var(--border)"><td style="padding:5px 6px;font-weight:700">'+esc(r.t)+'</td><td>'+esc(r.expiry)+'('+r.dte+'天)</td><td>$'+r.K+'</td><td>$'+r.mid+'</td><td class="'+(r.ev>=0?'up':'down')+'">'+(r.ev>=0?'+':'')+r.ev+'%</td><td>'+r.pw+'%</td><td style="color:var(--dim)">'+esc(r.gates||'✅')+'</td></tr>'}).join('')+'</table>'+
+        '<div class="dnote">EV=去趋势期望;完整Top10(含被⛔拦下的)在🎯期权tab。期权仓位≤总资金5%/笔。</div>')
+      :'<div style="font-size:12px;color:var(--dim);padding:4px 2px">今天 Top10 里没有通过全部门槛的期权(多为点差过宽/IV过贵)——宁缺毋滥,完整榜单见🎯期权tab。</div>')+'</div>';
+  }
 }
-renderDailyReview();
+renderDecision();
 
 /* compact watchlist cards grouped by sector */
 function statusOf(sym){
@@ -699,38 +743,7 @@ function renderOptions(){
   box.innerHTML=assess+scan+earn+rules;
 }
 renderOptions();
-/* ===== 🏆 今日最佳机会(集中火力于A+:策略√×状态√×离行动点近) ===== */
-function renderTopp(){
-  var box=$("toppBox");if(!box)return;var o=DATA.backtest&&DATA.backtest.optimized;if(!o){box.innerHTML='';return;}
-  var out=[];
-  Object.entries(DATA.signals||{}).forEach(function(e){
-    var t=e[0],s=e[1];var strat=o.stratmap[t];if(!strat||strat==='avoid')return;
-    var st=(DATA.states||{})[t];var stOk=!st||['tight','quiet','neutral'].indexOf(st.st)>=0;
-    var dist=null,action='',entry=null,stop=null;
-    if((strat==='brk'||strat==='brk_atr')&&o.breakout&&o.breakout[t]){var b=o.breakout[t];dist=b[2];action='等突破 $'+b[0];entry=b[0];stop=b[1];}
-    else if(strat==='hold'&&o.holdlv&&o.holdlv[t]){var v=o.holdlv[t];dist=Math.round((s.last-v.buy[0])/v.buy[0]*1000)/10;action='回踩买 $'+v.buy[0];entry=v.buy[0];stop=v.stop;}
-    else if(s.buyZones&&s.buyZones.length){var z=s.buyZones[0].px;dist=Math.round((s.last-z)/z*1000)/10;action='回踩买 $'+z;entry=z;stop=s.stop;}
-    if(dist===null)return;
-    var score=(s.score||50)-Math.abs(dist)*2-(stOk?0:35);
-    out.push({t:t,strat:strat,st:st?st.st:'neutral',stOk:stOk,dist:dist,action:action,score:score,entry:entry,stop:stop,near:s.near});
-  });
-  out.sort(function(a,b){return b.score-a.score});var top=out.slice(0,5);
-  var SL={brk:'📈突破',brk_atr:'📈突破·宽止损',hold:'🏔️长持',dip:'📉抄底',dip_re:'📉抄底+再进'};
-  var STL2={para:'🔥',hot:'🔥',brk:'⚠️',tight:'🛡️',quiet:'😴',neutral:'·'};
-  var mk=DATA.market;var mkHtml=mk?'<div class="intel-item" style="border-left-color:'+(mk.above?'var(--green)':'var(--red)')+'"><div class="intel-t">'+(mk.above?'🟢 大盘开关:'+(mk.gate||'SPY')+' '+mk.spy+' 在200日线上方(+'+mk.pct+'%)——允许追涨/正常仓位':'🔴 大盘开关:'+(mk.gate||'SPY')+' '+mk.spy+' 跌破200日线('+mk.pct+'%)——禁用突破追涨·总仓位减半(Faber)')+'</div></div>':'';
-  var pr=DATA.portRisk;var prHtml=pr?'<div class="intel-note">📐 <b>组合总风险(w′Σw)</b>:日波动 ±$'+pr.daily_usd+'('+pr.daily_pct+'%净值) · '+esc(pr.note)+'</div>':'';
-  var mc=(DATA.macroCal||[]);var today7=new Date();var mcHtml='';try{var soon=mc.filter(function(e){var d=new Date(e.date);var diff=(d-today7)/864e5;return diff>=-0.5&&diff<=7});if(soon.length)mcHtml='<div class="intel-note">📅 <b>近期宏观/事件(7天内)</b>:'+soon.map(function(e){return e.date.slice(5)+' '+esc(e.ev)+'['+esc(e.impact)+']'}).join(' · ')+'</div>';}catch(er){}
-var corrHtml=(DATA.corr&&DATA.corr.length)?'<div class="intel-note">⚠️ <b>相关簇限仓</b>(120日相关&gt;0.7,同簇≈同一注,每簇最多1-2个仓位):'+DATA.corr.map(function(c){return '['+c.join(' ')+']'}).join(' · ')+'</div>':'';
-  box.innerHTML=mkHtml+prHtml+mcHtml+'<div class="intel-note">3万本金要快速积累,靠的是<b>集中火力打A+机会</b>(策略对×状态允许×离行动点近),不是多开仓。排序=评分−距离惩罚−状态惩罚:</div>'+
-    top.map(function(x,i){
-      var warn=x.stOk?'':' <span style="color:var(--red);font-weight:700">(状态'+STL2[x.st]+'不允许,先等)</span>';var dual=(typeof rsFor==='function'&&rsFor(x.t).some(function(r){return r.direction==='up'}))?' <span style="color:#5b4a8a;font-weight:700">⭐研报共振</span>':'';
-      return '<div class="intel-item"><div class="intel-t">#'+(i+1)+' <span class="affchip" data-jump="'+x.t+'">'+x.t+'</span> '+(SL[x.strat]||x.strat)+' '+STL2[x.st]+' — '+x.action+'(现距'+(x.dist>=0?'+':'')+x.dist+'%)'+warn+dual+'</div>'+
-      (x.entry&&x.stop?posLine(x.t,x.entry,x.stop):'')+'</div>';
-    }).join('')+
-    '<div class="intel-note">纪律:一次最多2-3个在场机会;到点才动手,没到点=等;状态灯不允许=再好的价也不追。</div>'+corrHtml;
-  box.querySelectorAll('.affchip').forEach(function(ch){ch.addEventListener('click',function(){switchTab('watch');setTimeout(function(){var el=document.querySelector('#watchWrap [data-sym="'+ch.dataset.jump+'"]');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.outline='2px solid var(--primary)';setTimeout(function(){el.style.outline=''},1500)}},80)})});
-}
-renderTopp();
+/* (原🏆今日最佳机会已并入🎯今日决策卡——A+机会=决策卡的可动手/盯价项) */
 /* ===== ⚖️ 执行审计 ===== */
 var AUDIT_PAGE=0,AUDIT_PER=10;
 function renderAudit(){
@@ -940,9 +953,24 @@ function openOpt(sym){
       '<div class="mrow"><span>便宜度判定</span><span>'+volTxt+'</span></div>'+
       '<div style="font-size:12px;line-height:1.6;margin-top:6px">'+advice+' <span style="color:var(--dim)">到期45–60天,具体合约见🎯期权tab Top10实盘。</span></div>'+
     '</div>'):'';
+  /* 持仓状态一行(若持有):弹窗即单票完整档案,不用切回持仓tab */
+  const posList=DATA.positions.filter(function(p){return p.sym===sym});
+  const posSec=posList.length?('<div class="msec"><b style="font-size:13px">💼 我的持仓</b>'+posList.map(function(p){
+    return '<div class="mrow"><span>'+(p.type==='OPT'?esc(p.expiry+' '+p.strike+'C ×'+p.qty):p.qty+'股 @'+p.avgCost)+(p.action?' <b style="color:'+(p.action.cls==='danger'?'var(--red)':p.action.cls==='warn'?'var(--yellow)':'var(--green)')+'">【'+esc(p.action.tag)+'】</b>':'')+'</span><span class="'+((p.uPnl||0)>=0?'up':'down')+'" style="font-weight:700">'+money(p.uPnl)+'</span></div>';
+  }).join('')+'</div>'):'';
+  /* 该票研报观点(最新3条+方向/TP;全部在资讯tab,这里只给该票切片) */
+  const rs=(DATA.research||[]).filter(function(r){return r.t===sym}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'')});
+  const rsSec=rs.length?('<div class="msec"><b style="font-size:13px">📑 研报观点('+rs.length+'条,最新3)</b>'+rs.slice(0,3).map(function(r){
+    var dir=r.direction==='up'?'<span style="color:var(--green)">▲看多</span>':r.direction==='down'?'<span style="color:var(--red)">▼看空</span>':'<span style="color:var(--dim)">·中性</span>';
+    return '<div style="font-size:11.5px;margin-top:6px;line-height:1.6"><b>'+esc(r.broker||'')+'</b> '+(r.date||'').slice(5)+' '+dir+(r.tp?' TP$'+r.tp:'')+' — '+esc((r.view||'').slice(0,60))+'</div>';
+  }).join('')+'</div>'):'';
+  /* 暗盘SVR(若该票在雷达里) */
+  var dkSec='';
+  try{var dk=(DATA.dark&&DATA.dark.rows||[]).find(function(r){return (r.t||r[0])===sym});
+    if(dk){var z=(dk.z!=null?dk.z:dk[2]);var svr=(dk.svr!=null?dk.svr:dk[1]);dkSec='<div class="msec" style="font-size:12px"><b>🌑 暗盘SVR</b> '+svr+'%(z='+z+')'+(Math.abs(z)>=2?' <b style="color:var(--purple)">异常'+(z>0?'吸筹?':'出货?')+'</b>':' 正常')+'</div>';}}catch(er){}
   document.getElementById('modalBox').innerHTML=
     '<button class="mclose" onclick="document.getElementById(\'modalOv\').classList.remove(\'on\')">✕ 关闭</button>'+
-    '<h2>'+esc(name)+' <span style="font-size:14px;color:var(--dim)">'+sym+' · '+(spot!=null?'$'+spot:'')+'</span></h2>'+scoreSec+chanSec+optSec+
+    '<h2>'+esc(name)+' <span style="font-size:14px;color:var(--dim)">'+sym+' · '+(spot!=null?'$'+spot:'')+'</span></h2>'+posSec+scoreSec+chanSec+rsSec+optSec+dkSec+
     '<div class="msec" style="font-size:11px;color:var(--dim);border-top:1px solid var(--border);padding-top:10px">决策辅助,非投资建议。</div>';
   document.getElementById('modalOv').classList.add('on');
 }

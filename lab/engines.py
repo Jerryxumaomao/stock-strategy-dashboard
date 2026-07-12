@@ -417,6 +417,40 @@ def assemble_payload(results, cfg, extras, barsmap):
                  "todo": todo,
                  "note": "决策辅助,非投资建议。建议由持仓数据规则化生成,点位为结构参考。"}
 
+    # 今日决策卡(结论先行首页):持仓待办+自选可动手合并 + 买入档清单 + 通过门槛期权 + 盯价
+    todo_syms = {t["sym"] for t in (daily or {}).get("todo", [])}
+    acts = [dict(t, src="持仓") for t in (daily or {}).get("todo", [])]
+    watch_px, buy_list = [], []
+    for sym, s in signals.items():
+        w = s.get("wact") or {}
+        if (w.get("cls") == "buy" or w.get("tag") == "可减仓") and sym not in todo_syms:
+            acts.append({"src": "自选", "sym": sym, "label": "", "cls": "do" if w.get("cls") == "buy" else "warn",
+                         "tag": w.get("tag"), "text": w.get("text"), "plan": f"止损${s['stop']}" if s.get("stop") else ""})
+        elif w.get("cls") == "dip" and s.get("buyZones"):
+            watch_px.append({"sym": sym, "word": "破" if "突破" in (w.get("tag") or "") else "回", "px": s["buyZones"][0]["px"]})
+        if (s.get("compo") or {}).get("tier") == "buy":
+            buy_list.append({"sym": sym, "C": s["compo"]["C"], "held": sym in held,
+                             "tag": w.get("tag", ""), "text": w.get("text", ""), "stop": s.get("stop")})
+    buy_list.sort(key=lambda x: -x["C"])
+    rank2 = {"danger": 0, "warn": 1, "do": 2}
+    acts.sort(key=lambda a: rank2.get(a.get("cls"), 3))
+    opt_picks = [{"t": r.get("t"), "expiry": r.get("expiry"), "dte": r.get("dte"), "K": r.get("K") or r.get("strike"),
+                  "mid": r.get("mid"), "ev": r.get("ev") or r.get("EV"), "pw": r.get("pw") or r.get("P_win"), "gates": "✅"}
+                 for r in (extras.get("top10") or []) if not r.get("gates")][:5]
+    n_up_w = sum(1 for s in signals.values() if (s.get("chg") or 0) > 0)
+    n_dn_w = sum(1 for s in signals.values() if (s.get("chg") or 0) < 0)
+    decision = {
+        "asOf": now,
+        "brief": (daily or {}).get("brief") or f"自选池{n_up_w}涨{n_dn_w}跌;无持仓数据,行动清单为自选买卖点。",
+        "counts": {"urgent": sum(1 for a in acts if a["cls"] == "danger"),
+                   "trim": sum(1 for a in acts if a["cls"] == "warn"),
+                   "act": sum(1 for a in acts if a["cls"] == "do"),
+                   "px": len(watch_px), "buy": len(buy_list), "opt": len(opt_picks)},
+        "acts": acts, "watchPx": watch_px, "buyList": buy_list, "optPicks": opt_picks,
+        "optAsOf": now if opt_picks else "",
+        "note": "决策辅助,非投资建议。行动清单=持仓处置+自选买卖点合并去重;点位为结构参考。",
+    }
+
     alerts = []
     if market:
         gate = market.get("gate") or "SPY"
@@ -447,7 +481,7 @@ def assemble_payload(results, cfg, extras, barsmap):
         "darkprints": None, "extended": None,
         "options": ({"scan": extras.get("top10") or [], "scanAsOf": now} if extras.get("top10") else {}),
         "intel": [], "research": [], "researchMeta": None, "audit": extras.get("audit"),
-        "portRisk": None, "dailyReview": daily, "watchSummary": dict(asOf=now, **wsum),
+        "portRisk": None, "dailyReview": daily, "decision": decision, "watchSummary": dict(asOf=now, **wsum),
         "alerts": alerts,
         "meta": {"firstRun": not results, "source": source, "engine": "opensource"},
     }

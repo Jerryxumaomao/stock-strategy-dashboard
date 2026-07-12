@@ -44,13 +44,14 @@ assert c > 0, "DATA 花括号不配对"
 h = h[:k] + "const DATA=/*__DATA__*/{};" + h[c + 1:].lstrip(";")
 
 # ── 2. 洗个人化 ──
-# 2a. 告警块: 硬编码(组合集中度/杠杆)→ 全数据驱动 DATA.alerts=[[cls,txt],...]
-al_start = h.index("/* alerts")
-al_end = h.index('$("alerts").innerHTML', al_start)
-al_end = h.index(";", h.index("join", al_end)) + 1
-h = h[:al_start] + ('/* alerts —— 全数据驱动(build 按数据情况生成组合级提示) */\n'
-                    'const alerts=(DATA.alerts||[]);\n'
-                    '$("alerts").innerHTML=alerts.map(al=>`<div class="alert ${al[0]}">${al[1]}</div>`).join("");') + h[al_end:]
+# 2a. 告警块(2026-07-11 起私人版已删——组合级提示并入决策卡环境行;历史模板兼容:有才替换)
+if "/* alerts" in h and '$("alerts").innerHTML' in h:
+    al_start = h.index("/* alerts")
+    al_end = h.index('$("alerts").innerHTML', al_start)
+    al_end = h.index(";", h.index("join", al_end)) + 1
+    h = h[:al_start] + ('/* alerts —— 全数据驱动(build 按数据情况生成组合级提示) */\n'
+                        'const alerts=(DATA.alerts||[]);\n'
+                        '$("alerts").innerHTML=alerts.map(al=>`<div class="alert ${al[0]}">${al[1]}</div>`).join("");') + h[al_end:]
 
 # 2b. 标题/称谓
 h = h.replace("<title>交易看板</title>", "<title>Stock Strategy Dashboard</title>")
