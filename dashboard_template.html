@@ -426,7 +426,7 @@ function renderDecision(){
   /* 环境一行: 大盘开关 + 组合风险 + 杠杆 + 7天宏观(全部直读现有 DATA 字段,不复制数据) */
   var env=[];
   var mk=DATA.market;
-  if(mk) env.push(mk.above?'🟢大盘:SPY在200日线上+'+mk.pct+'%':'🔴大盘:SPY破200日线'+mk.pct+'%·禁追涨仓位减半');
+  if(mk){var gname=mk.gate||'SPY';env.push(mk.above?'🟢大盘:'+gname+'在200日线上+'+mk.pct+'%':'🔴大盘:'+gname+'破200日线'+mk.pct+'%·禁追涨仓位减半');}
   var pr=DATA.portRisk; if(pr&&pr.daily_usd!=null) env.push('组合日波动±$'+pr.daily_usd+'('+pr.daily_pct+'%)');
   var acc=DATA.account; if(acc&&acc.leverage!=null&&!(acc.leverage<=1.05&&acc.cash>0)) env.push('⚠️杠杆'+acc.leverage+'x·注意保证金');
   try{var now7=new Date();var soon=(DATA.macroCal||[]).filter(function(e){var d=(new Date(e.date)-now7)/864e5;return d>=-0.5&&d<=7});
