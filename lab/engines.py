@@ -157,7 +157,7 @@ ST_T = {"tight": (15, "紧平台·埋伏安全"), "quiet": (12, "低波动安静
         "brk": (3, "破位·不接飞刀"), "hot": (3, "短期过热"), "para": (0, "抛物线")}
 
 
-def composite(sym, s, stratmap, breakout, holdlv, per_ticker, states, market, today):
+def composite(sym, s, stratmap, breakout, holdlv, per_ticker, states, market, today, macro=None):
     """综合买入评分(composite.js 移植;开源版无研报→中性7.5如实标注)。"""
     strat = stratmap.get(sym)
     st = (states.get(sym) or {}).get("st")
@@ -228,6 +228,25 @@ def composite(sym, s, stratmap, breakout, holdlv, per_ticker, states, market, to
         gates.append({"id": "G3", "txt": "过热状态勿追突破,只等回踩"}); cap_watch = True
     if cc == "sell":
         gates.append({"id": "G5", "txt": "缠论卖点成立"}); cap_watch = True
+    # G7 财报前多头拥挤(花旗《人群过滤器》2026-07-10):财报≤7日且拥挤→beat涨少/miss难恢复,压到观察。
+    # 开源版拥挤代理只有 IVP/状态灯(无研报台账);财报日来自 earnings 雷达(yfinance)。
+    try:
+        import datetime as _dt
+        t0 = _dt.date.fromisoformat(today)
+        ern = next((e for e in (macro or []) if sym in (e.get("ev") or "") and e.get("date")
+                    and 0 <= (_dt.date.fromisoformat(e["date"]) - t0).days <= 7), None)
+        if ern:
+            st_l = (states.get(sym) or {}).get("st")
+            why = []
+            if s.get("ivp") is not None and s["ivp"] >= 85:
+                why.append(f"IVP{s['ivp']}%")
+            if st_l in ("hot", "para"):
+                why.append("状态" + st_l)
+            if why:
+                gates.append({"id": "G7", "txt": f"财报前拥挤({ern['date'][5:]}财报·{'/'.join(why)}):beat涨少/miss难恢复,财报前禁加仓"})
+                cap_watch = True
+    except Exception:
+        pass
 
     if hard_avoid:
         tier, tier_txt = "avoid", "回避·破位失效"
@@ -367,8 +386,11 @@ def assemble_payload(results, cfg, extras, barsmap):
         signals[sym] = s
 
     market = extras.get("market")
+    # 财报日历(提前构建,G7财报前拥挤闸门要用;payload 复用同一变量)
+    macro = [{"date": e.get("date"), "ev": f"{e.get('t') or e.get('ticker')} 财报", "impact": "高"}
+             for e in (extras.get("earnings") or []) if e.get("date")]
     for sym, s in signals.items():
-        s["compo"] = composite(sym, s, stratmap, breakout, holdlv, per_ticker, states, market, today)
+        s["compo"] = composite(sym, s, stratmap, breakout, holdlv, per_ticker, states, market, today, macro=macro)
         s["verdict"] = s["compo"]["tier"]
 
     # 持仓(config.json 可选 "positions":[{"sym","qty","avgCost"}] 正股)
@@ -460,9 +482,6 @@ def assemble_payload(results, cfg, extras, barsmap):
     if extras.get("clusters"):
         alerts.append(["blue", "<b>相关簇限仓</b>:高相关票≈同一注,每簇最多1-2个仓位:" +
                        " · ".join("[" + " ".join(c) + "]" for c in extras["clusters"][:4])])
-
-    macro = [{"date": e.get("date"), "ev": f"{e.get('t') or e.get('ticker')} 财报", "impact": "高"}
-             for e in (extras.get("earnings") or []) if e.get("date")]
 
     groups = cfg.get("groups") or [{"name": "自选 Watchlist", "tickers": [r["ticker"] for r in results]}]
     payload = {
